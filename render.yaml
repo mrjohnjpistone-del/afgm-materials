@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: afgm-materials
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      # No DATA_DIR here on purpose: the free plan has no disk to point it at,
+      # so the server falls back to ./data and the mirror below is what makes
+      # the list durable. Move to a paid plan with a disk and you would add
+      # DATA_DIR=/var/data and could drop BACKUP_URL/BACKUP_KEY.
+      - key: MATERIALS_KEY
+        sync: false
+      # Optional off-box mirror. Free Render services wipe their filesystem when
+      # they sleep, so the list is also pushed to a key-gated blob endpoint on a
+      # service that has a persistent disk, and restored from it on a cold boot.
+      - key: BACKUP_URL
+        sync: false
+      - key: BACKUP_KEY
+        sync: false
