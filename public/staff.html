@@ -6,22 +6,6 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Manage the Materials List</title>
 <style>
-  :root{
-    --bg:#f6efe4; --panel:#fffaf2; --panel-2:#f3e9d8; --ink:#241a12; --ink-soft:#6a5c4a;
-    --line:#e2d3ba; --gold:#b8862f; --gold-ink:#7a5410; --wine:#7a1f2b; --wine-ink:#5c1620;
-    --ok:#2f6b46; --ok-bg:#e4f0e6; --err:#9a2530; --err-bg:#f7e4e2;
-    --shadow:0 10px 40px rgba(50,30,10,.14); --radius:16px;
-    --serif:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
-    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  }
-  @media (prefers-color-scheme:dark){
-    :root{
-      --bg:#171310; --panel:#221b15; --panel-2:#2b221a; --ink:#f3e8d8; --ink-soft:#b7a58c;
-      --line:#3a2e22; --gold:#e0ad55; --gold-ink:#f0cd8b; --wine:#d98a94; --wine-ink:#eab6bc;
-      --ok:#8fd0a3; --ok-bg:#1d2a20; --err:#f0a7a1; --err-bg:#2c1a19;
-      --shadow:0 12px 44px rgba(0,0,0,.5);
-    }
-  }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
@@ -46,7 +30,6 @@
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a5410' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
     background-repeat:no-repeat; background-position:right 12px center; padding-right:38px; cursor:pointer;
   }
-  @media (prefers-color-scheme:dark){ select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f0cd8b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");} }
   input:focus,textarea:focus,select:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%,transparent)}
   button:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
   textarea{min-height:64px; resize:vertical}
@@ -58,7 +41,6 @@
     border:1px solid transparent; padding:11px 16px; transition:transform .06s ease, filter .15s}
   .btn:active{transform:translateY(1px)}
   .btn-primary{background:var(--wine); color:#fff}
-  @media (prefers-color-scheme:dark){ .btn-primary{color:#1a1410} }
   .btn-primary:disabled{opacity:.55; cursor:not-allowed}
   .btn-ghost{background:transparent; color:var(--ink); border-color:var(--line); font-weight:600}
   .btn-ghost:hover{background:var(--panel-2)}
@@ -83,7 +65,6 @@
 
   .item{background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:13px 14px; margin-bottom:9px;
     display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start; box-shadow:0 2px 10px rgba(50,30,10,.05)}
-  @media (prefers-color-scheme:dark){ .item{box-shadow:none} }
   .item.done .name{text-decoration:line-through; opacity:.6}
   .qty{font-family:var(--serif); font-size:20px; font-weight:700; color:var(--gold-ink); min-width:56px; text-align:center;
     background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:6px 8px; line-height:1.15}
@@ -96,10 +77,8 @@
   .tag.area{color:var(--gold-ink)}
   .tag.cost{color:var(--ink)}
   .tag.new{color:#fff; background:var(--wine); border-color:var(--wine)}
-  @media (prefers-color-scheme:dark){ .tag.new{color:#1a1410} }
   .note{font-size:13px; color:var(--ink-soft); margin-top:5px; overflow-wrap:anywhere}
   .note a{color:var(--wine-ink)}
-  @media (prefers-color-scheme:dark){ .note a{color:var(--wine)} }
   .actions{display:flex; flex-direction:column; gap:6px; align-items:stretch; min-width:118px}
   .actions select{padding:7px 28px 7px 10px; font-size:13px; font-weight:700; background-position:right 8px center}
   .row-btns{display:flex; gap:6px}
@@ -143,18 +122,69 @@
     .item{break-inside:avoid; box-shadow:none; border-color:#bbb}
     .masthead{padding-top:0}
   }
+  /* ── Props table: real columns on a wide screen, stacked cards on a phone ── */
+  .ptable{width:100%; border-collapse:separate; border-spacing:0 8px}
+  .ptable th{font-family:var(--serif); text-transform:uppercase; letter-spacing:.12em; font-size:11.5px; font-weight:600;
+    color:var(--ink-soft); text-align:left; padding:0 12px 2px}
+  .ptable td{background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    padding:11px 12px; vertical-align:top; font-size:14px}
+  .ptable td:first-child{border-left:4px solid var(--line); border-radius:11px 0 0 11px}
+  .ptable td:last-child{border-right:1px solid var(--line); border-radius:0 11px 11px 0}
+  .ptable tr[data-st="have"] td:first-child,.ptable tr[data-st="show-ready"] td:first-child{border-left-color:var(--ok)}
+  .ptable tr[data-st="borrow"] td:first-child,.ptable tr[data-st="in rehearsal"] td:first-child{border-left-color:var(--gold)}
+  .ptable tr[data-st="buy"] td:first-child,.ptable tr[data-st="make"] td:first-child{border-left-color:#6f8ad6}
+  .ptable tr[data-st=""] td:first-child{border-left-color:var(--wine)}
+  .ptable{table-layout:fixed}
+  .ptable th:nth-child(1){width:23%} .ptable th:nth-child(2){width:8%} .ptable th:nth-child(3){width:24%} .ptable th:nth-child(4){width:20%} .ptable th:nth-child(5){width:17%} .ptable th:nth-child(6){width:16%}
+  .ptable select{min-width:0 !important}
+  .p-acts{flex-wrap:wrap}
+  .p-item{font-weight:700; overflow-wrap:anywhere}
+  .p-sub{display:block; font-size:12.5px; color:var(--ink-soft)}
+  .p-qty{font-family:var(--serif); font-weight:600; font-size:17px; color:var(--gold-ink); white-space:nowrap}
+  .pill{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    border-radius:999px; padding:3px 10px; border:1px solid var(--line); background:#0a0f1d; white-space:nowrap}
+  .pill.st-have,.pill.st-show-ready{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+  .pill.st-borrow,.pill.st-in-rehearsal{color:var(--gold-ink); border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
+  .pill.st-buy,.pill.st-make{color:#a9bcf5; border-color:#34457a}
+  .pill.st-none{color:var(--wine-ink); border-color:color-mix(in srgb,var(--wine) 45%,var(--line))}
+  @media (max-width:680px){
+    .ptable thead{display:none}
+    .ptable,.ptable tbody,.ptable tr,.ptable td{display:block; width:100%}
+    .ptable tr{background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--wine); border-radius:12px;
+      padding:10px 12px; margin-bottom:9px}
+    .ptable tr[data-st="have"],.ptable tr[data-st="show-ready"]{border-left-color:var(--ok)}
+    .ptable tr[data-st="borrow"],.ptable tr[data-st="in rehearsal"]{border-left-color:var(--gold)}
+    .ptable tr[data-st="buy"],.ptable tr[data-st="make"]{border-left-color:#6f8ad6}
+    .ptable td{border:0 !important; border-radius:0 !important; background:none; padding:3px 0}
+    .ptable td[data-label]::before{content:attr(data-label); display:inline-block; min-width:118px;
+      font-family:var(--serif); text-transform:uppercase; letter-spacing:.1em; font-size:10.5px; color:var(--ink-soft)}
+  }
+  [hidden]{display:none !important}
+  .ptable select{padding:7px 28px 7px 10px; font-size:13px; font-weight:700; background-position:right 8px center; min-width:140px}
+  .p-acts{display:flex; gap:6px; justify-content:flex-end}
+  .gate-wrap{margin-top:22px}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/poster.css?v=2">
 </head>
 <body>
+<header class="poster">
+  <div class="flag" aria-hidden="true"><svg viewBox="0 0 1900 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="afgmStripes" width="1900" height="153.84" patternUnits="userSpaceOnUse"><rect width="1900" height="76.92" fill="#b22234"/><rect y="76.92" width="1900" height="76.92" fill="#ebe5d6"/></pattern><pattern id="afgmStars" width="126.6" height="107.6" patternUnits="userSpaceOnUse"><polygon transform="translate(31.6,26.9)" points="0,-15 3.5,-4.8 14.3,-4.6 5.7,1.9 8.8,12.1 0,6.1 -8.8,12.1 -5.7,1.9 -14.3,-4.6 -3.5,-4.8" fill="#f4f1e8"/><polygon transform="translate(94.9,80.7)" points="0,-15 3.5,-4.8 14.3,-4.6 5.7,1.9 8.8,12.1 0,6.1 -8.8,12.1 -5.7,1.9 -14.3,-4.6 -3.5,-4.8" fill="#f4f1e8"/></pattern><linearGradient id="afgmFolds" x1="0" x2="1" y1="0" y2="0.25"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".11" stop-color="#fff" stop-opacity=".10"/><stop offset=".24" stop-color="#000" stop-opacity=".5"/><stop offset=".37" stop-color="#fff" stop-opacity=".12"/><stop offset=".51" stop-color="#000" stop-opacity=".55"/><stop offset=".65" stop-color="#fff" stop-opacity=".1"/><stop offset=".8" stop-color="#000" stop-opacity=".5"/><stop offset=".92" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient><filter id="afgmWave" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.0016 0.0045" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="110" xChannelSelector="R" yChannelSelector="G"/></filter></defs><g filter="url(#afgmWave)" transform="rotate(-5 950 500)"><rect x="-120" y="0" width="2140" height="1100" fill="url(#afgmStripes)"/><rect x="-120" y="-120" width="2140" height="120" fill="#ebe5d6"/><rect x="-120" y="-120" width="880" height="658" fill="#1c2a5a"/><rect x="-120" y="-120" width="880" height="658" fill="url(#afgmStars)"/><rect x="-120" y="-120" width="2140" height="1240" fill="url(#afgmFolds)"/></g></svg></div>
+  <div class="embers" aria-hidden="true"><i style="--x:0.0%;--d:3.6s;--t:6.9s;--dx:-45px;--s:4.6px;--y:49%"></i><i style="--x:51.7%;--d:3.7s;--t:7.8s;--dx:-16px;--s:2.7px;--y:70%"></i><i style="--x:14.1%;--d:3.0s;--t:8.5s;--dx:49px;--s:3.1px;--y:26%"></i><i style="--x:21.8%;--d:5.9s;--t:8.6s;--dx:17px;--s:3.4px;--y:36%"></i><i style="--x:30.8%;--d:6.4s;--t:5.1s;--dx:-27px;--s:3.7px;--y:70%"></i><i style="--x:1.4%;--d:3.1s;--t:10.3s;--dx:13px;--s:2.3px;--y:63%"></i><i style="--x:95.9%;--d:2.6s;--t:10.4s;--dx:-48px;--s:4.2px;--y:77%"></i><i style="--x:94.9%;--d:2.3s;--t:6.0s;--dx:46px;--s:4.8px;--y:71%"></i><i style="--x:100.0%;--d:6.4s;--t:7.6s;--dx:-19px;--s:3.8px;--y:22%"></i><i style="--x:95.2%;--d:6.7s;--t:7.1s;--dx:55px;--s:2.0px;--y:67%"></i><i style="--x:95.1%;--d:4.4s;--t:9.1s;--dx:11px;--s:4.6px;--y:50%"></i><i style="--x:92.8%;--d:8.0s;--t:7.6s;--dx:47px;--s:3.5px;--y:36%"></i><i style="--x:4.8%;--d:0.4s;--t:10.0s;--dx:-37px;--s:3.1px;--y:59%"></i><i style="--x:37.7%;--d:3.8s;--t:5.6s;--dx:-5px;--s:2.5px;--y:60%"></i><i style="--x:55.1%;--d:7.4s;--t:5.6s;--dx:68px;--s:5.0px;--y:74%"></i><i style="--x:56.5%;--d:3.0s;--t:10.2s;--dx:28px;--s:3.5px;--y:41%"></i><i style="--x:53.3%;--d:2.1s;--t:10.8s;--dx:18px;--s:4.7px;--y:30%"></i><i style="--x:15.9%;--d:7.7s;--t:9.1s;--dx:-15px;--s:4.5px;--y:45%"></i><i style="--x:87.9%;--d:3.9s;--t:8.1s;--dx:-22px;--s:2.3px;--y:76%"></i><i style="--x:87.3%;--d:2.1s;--t:9.5s;--dx:-9px;--s:4.6px;--y:50%"></i><i style="--x:0.1%;--d:0.2s;--t:5.2s;--dx:17px;--s:2.9px;--y:77%"></i><i style="--x:31.7%;--d:5.1s;--t:10.9s;--dx:9px;--s:4.3px;--y:32%"></i><i style="--x:65.4%;--d:4.0s;--t:6.5s;--dx:-18px;--s:3.5px;--y:64%"></i><i style="--x:45.9%;--d:2.4s;--t:7.9s;--dx:11px;--s:2.4px;--y:64%"></i></div>
+  <div class="poster-in">
+    <p class="presents">Toad Suck Harley-Davidson &amp; Rialto Community Arts Center<br>proudly present a Bold Theatre production of</p>
+    <h1 class="gold-title">A Few Good Men</h1>
+    <p class="credits">Written by <b>Aaron Sorkin</b> &nbsp;·&nbsp; Directed by <b>John J. Pistone</b></p>
+    <p class="dates">November 6–21, 2026</p>
+    <p class="times">Fridays &amp; Saturdays 7PM &nbsp;·&nbsp; Sundays 3PM</p>
+    <div class="page-label" id="pageTitle">Build Lead · Manage</div>
+  </div>
+</header>
 
 <!-- ── Key gate ───────────────────────────────────────────────────────────── -->
 <div class="wrap gate-wrap" id="gate">
-  <header class="masthead">
-    <div class="eyebrow">Set Build</div>
-    <h1>Manage the List</h1>
-    <div class="subtitle">Build lead access</div>
-  </header>
-  <div class="rule"></div>
   <div class="card">
     <div id="gateMsg" hidden></div>
     <form id="gateForm">
@@ -173,15 +203,15 @@
 
 <!-- ── The manage view ────────────────────────────────────────────────────── -->
 <div class="wrap" id="app" hidden>
-  <header class="masthead">
-    <div class="eyebrow">Set Build · Build lead</div>
-    <h1 id="pageTitle">Materials List</h1>
-    <div class="subtitle" id="showName"></div>
-  </header>
+  <div class="tabs" role="tablist" aria-label="Which list">
+    <button class="tab" role="tab" id="tabMaterials" aria-controls="viewMaterials" aria-selected="true" type="button">Materials</button>
+    <button class="tab" role="tab" id="tabProps" aria-controls="viewProps" aria-selected="false" type="button">Props</button>
+  </div>
   <div class="rule"></div>
 
   <div id="msg" hidden></div>
 
+  <section id="viewMaterials" role="tabpanel" aria-labelledby="tabMaterials">
   <div class="card toolbar-card">
     <div class="toolbar">
       <label>
@@ -323,10 +353,121 @@
     <div id="trash"></div>
   </div>
 
+  </section>
+
+  <!-- ══ PROPS ══════════════════════════════════════════════════════════════ -->
+  <section id="viewProps" role="tabpanel" aria-labelledby="tabProps" hidden>
+  <div class="card toolbar-card">
+    <div class="toolbar">
+      <label>
+        <span class="lab">Search</span>
+        <input id="pq" type="search" placeholder="Search props, scenes, actors…" autocomplete="off">
+      </label>
+      <button class="btn btn-primary" id="pAddBtn" type="button">+ Add prop</button>
+    </div>
+    <div class="filters">
+      <label>
+        <span class="lab">Group by</span>
+        <select id="pGroupBy">
+          <option value="scene">Scene</option>
+          <option value="status">Source · status</option>
+          <option value="used_by">Used by</option>
+          <option value="none">Nothing — one list</option>
+        </select>
+      </label>
+      <label>
+        <span class="lab">Show</span>
+        <select id="pStatusFilter"></select>
+      </label>
+      <label>
+        <span class="lab">Sort</span>
+        <select id="pSortBy">
+          <option value="pages">Script pages</option>
+          <option value="item">Item name</option>
+          <option value="newest">Newest first</option>
+        </select>
+      </label>
+    </div>
+    <div class="summary" id="pSummary"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
+      <a class="btn btn-ghost btn-sm" href="/api/props.csv">Download props spreadsheet</a>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="window.print()">Print the props list</button>
+    </div>
+  </div>
+
+  <div class="card" id="pFormCard" hidden>
+    <form id="propForm" novalidate>
+      <h2 class="sec" id="pFormTitle">Add a prop</h2>
+      <div class="form-grid">
+        <label class="full">
+          <span class="lab">Item <span class="req">*</span></span>
+          <input id="p_item" maxlength="160" required>
+        </label>
+        <label>
+          <span class="lab">Qty</span>
+          <input id="p_qty" maxlength="20" value="1">
+        </label>
+        <label>
+          <span class="lab">Source · status</span>
+          <select id="p_status"></select>
+        </label>
+        <label>
+          <span class="lab">Scene</span>
+          <input id="p_scene" maxlength="120" list="scenes">
+          <datalist id="scenes"></datalist>
+        </label>
+        <label>
+          <span class="lab">Script pages</span>
+          <input id="p_pages" maxlength="60" placeholder="e.g. 55-96">
+        </label>
+        <label>
+          <span class="lab">Used by</span>
+          <input id="p_used" maxlength="120">
+        </label>
+        <label>
+          <span class="lab">Preset</span>
+          <input id="p_preset" maxlength="80" list="presets" placeholder="SL table, SR table, onstage…">
+          <datalist id="presets"><option>SL prop table</option><option>SR prop table</option><option>Onstage</option><option>Personal prop</option></datalist>
+        </label>
+        <label class="full">
+          <span class="lab">Notes</span>
+          <textarea id="p_notes" maxlength="800"></textarea>
+        </label>
+        <label class="full">
+          <span class="lab">Added by</span>
+          <input id="p_by" maxlength="80" placeholder="Optional">
+        </label>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px">
+        <button class="btn btn-primary" id="pSaveBtn" type="submit" style="flex:1">Add to props</button>
+        <button class="btn btn-ghost" id="pCancelBtn" type="button">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="plist"><div class="card"><div class="empty">Loading the props…</div></div></div>
+
+  <div class="card" id="pTrashCard" hidden style="margin-top:22px">
+    <h2 class="sec">Recently removed props</h2>
+    <div id="pTrash"></div>
+  </div>
+  </section>
+
   <div class="foot-note">
-    Anyone with the public link can add items. Only this page can change or remove them.
+    Anyone with the public link can add items and props. Only this page can change or remove them.
   </div>
 </div>
+<footer class="sponsors">
+  <div class="sp-row">
+    <div class="sp lead"><small>Brought to you by</small><span>Jay Hodge Ford</span></div>
+  </div>
+  <div class="sp-row" style="margin-top:16px">
+    <div class="sp"><small>Set construction partner</small><span>Ace Hardware</span></div>
+    <div class="sp"><small>Community partner</small><span>Morrilton Area Chamber of Commerce</span></div>
+    <div class="sp"><small>Community partner</small><span>TA Express</span></div>
+  </div>
+  <div class="sp-venue">Rialto Community Arts Center · 215 E Broadway St, Morrilton, AR</div>
+</footer>
 
 <script>
 "use strict";
@@ -337,6 +478,9 @@ const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) =>
 const KEYNAME = "afgm_materials_key";
 let KEY = localStorage.getItem(KEYNAME) || (new URLSearchParams(location.search).get("key") || "");
 let ITEMS = [], TRASH = [], CATS = [], STATUSES = [], AREAS = [], editingId = null, busy = false, poll = null;
+let PROPS = [], PTRASH = [], PSTAT = [], SCENES = [], pEditingId = null;
+const stLabel = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "Not decided";
+const firstPage = (p) => { const m = String(p || "").match(/\d+/); return m ? Number(m[0]) : 9999; };
 const UNASSIGNED = "Unassigned";
 
 const money = (n) => "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -383,18 +527,19 @@ async function refresh(quiet) {
   CATS = d.categories || [];
   STATUSES = d.statuses || [];
   AREAS = d.areas || [];
+  PROPS = d.props || [];
+  PTRASH = d.props_trash || [];
+  PSTAT = d.prop_statuses || [];
+  SCENES = d.scenes || [];
   if (d.title) {
-    const parts = String(d.title).split("—");
-    if (parts.length > 1) {
-      $("#showName").textContent = parts[0].trim();
-      $("#pageTitle").textContent = parts.slice(1).join("—").trim();
-    } else $("#showName").textContent = d.title;
+    document.title = "Manage · " + d.title;
     if (document.activeElement !== $("#s_title")) $("#s_title").value = d.title;
   }
   if (document.activeElement !== $("#s_notes")) $("#s_notes").value = d.notes || "";
   $("#pubLink").value = location.origin + "/";
   fillSelects();
   render();
+  renderProps();
 }
 
 function fillSelects() {
@@ -407,6 +552,17 @@ function fillSelects() {
     st.innerHTML = STATUSES.map((c) => '<option value="' + esc(c) + '">' + esc(c) + "</option>").join("");
   }
   $("#areas").innerHTML = AREAS.map((a) => "<option>" + esc(a) + "</option>").join("");
+  $("#scenes").innerHTML = SCENES.map((a) => "<option>" + esc(a) + "</option>").join("");
+  const ps = $("#p_status");
+  if (ps.options.length !== PSTAT.length + 1) {
+    ps.innerHTML = '<option value="">Not decided yet</option>' +
+      PSTAT.map((c) => '<option value="' + esc(c) + '">' + esc(stLabel(c)) + "</option>").join("");
+  }
+  const pf = $("#pStatusFilter");
+  if (pf.options.length !== PSTAT.length + 2) {
+    pf.innerHTML = '<option value="*">Everything</option><option value="">Not decided yet</option>' +
+      PSTAT.map((c) => '<option value="' + esc(c) + '">' + esc(stLabel(c)) + "</option>").join("");
+  }
 }
 
 function visibleItems() {
@@ -682,11 +838,225 @@ for (const id of ["#q", "#groupBy", "#statusFilter", "#sortBy"]) {
   $(id).addEventListener("input", render);
 }
 
+// ══ Props ════════════════════════════════════════════════════════════════════
+function visibleProps() {
+  const q = $("#pq").value.trim().toLowerCase();
+  const sf = $("#pStatusFilter").value;
+  const out = PROPS.filter((m) => {
+    if (sf !== "*" && (m.source_status || "") !== sf) return false;
+    if (!q) return true;
+    return [m.item, m.scene, m.pages, m.used_by, m.preset, m.notes, m.added_by]
+      .filter(Boolean).join(" ").toLowerCase().includes(q);
+  });
+  const cmp = {
+    pages: (a, b) => firstPage(a.pages) - firstPage(b.pages) || a.item.localeCompare(b.item),
+    item: (a, b) => a.item.localeCompare(b.item),
+    newest: (a, b) => (b.created_at || "").localeCompare(a.created_at || ""),
+  }[$("#pSortBy").value];
+  return out.sort(cmp);
+}
+
+function propGroupKey(m) {
+  const g = $("#pGroupBy").value;
+  if (g === "none") return "";
+  if (g === "status") return stLabel(m.source_status);
+  if (g === "used_by") return m.used_by || "Not assigned";
+  return m.scene || "No scene yet";
+}
+
+function propRow(m) {
+  const scene = [m.scene, m.pages ? "pp. " + m.pages : ""].filter(Boolean);
+  const used = [m.used_by, m.preset ? "preset " + m.preset : ""].filter(Boolean);
+  const opts = ['<option value=""' + (m.source_status ? "" : " selected") + ">Not decided</option>"].concat(
+    PSTAT.map((s) => '<option value="' + esc(s) + '"' + (s === m.source_status ? " selected" : "") + ">" +
+      esc(stLabel(s)) + "</option>")).join("");
+  return '<tr data-st="' + esc(m.source_status || "") + '" data-id="' + esc(m.id) + '">' +
+    '<td><span class="p-item">' + esc(m.item) + "</span>" +
+      (m.notes ? '<span class="p-sub">' + esc(m.notes) + "</span>" : "") +
+      (m.added_by ? '<span class="p-sub">added by ' + esc(m.added_by) + "</span>" : "") + "</td>" +
+    '<td data-label="Qty"><span class="p-qty">' + esc(m.qty) + "</span></td>" +
+    '<td data-label="Scene · pages">' + (scene.length ? esc(scene.join(" · ")) : '<span class="p-sub">—</span>') + "</td>" +
+    '<td data-label="Used by · preset">' + (used.length ? esc(used.join(" · ")) : '<span class="p-sub">—</span>') + "</td>" +
+    '<td data-label="Source · status"><label class="sr" for="ps-' + esc(m.id) + '">Source and status for ' + esc(m.item) +
+      '</label><select id="ps-' + esc(m.id) + '" data-pact="status">' + opts + "</select></td>" +
+    '<td><div class="p-acts"><button class="btn btn-ghost btn-sm" data-pact="edit" type="button">Edit</button>' +
+      '<button class="btn btn-danger btn-sm" data-pact="del" type="button">Remove</button></div></td></tr>';
+}
+
+function renderProps() {
+  const rows = visibleProps();
+  const decided = PROPS.filter((m) => m.source_status).length;
+  const ready = PROPS.filter((m) => m.source_status === "show-ready").length;
+  $("#pSummary").innerHTML = "<span><b>" + PROPS.length + "</b> props on the list</span>" +
+    "<span><b>" + (PROPS.length - decided) + "</b> not decided yet</span>" +
+    "<span><b>" + ready + "</b> show-ready</span>";
+
+  if (!PTRASH.length) $("#pTrashCard").hidden = true;
+  else {
+    $("#pTrashCard").hidden = false;
+    $("#pTrash").innerHTML = PTRASH.map((m) =>
+      '<div class="trash-row"><span>' + esc(m.qty) + " · <b>" + esc(m.item) + "</b>" +
+      (m.scene ? " · " + esc(m.scene) : "") + "</span>" +
+      '<button class="btn btn-ghost btn-sm" data-prestore="' + esc(m.id) + '" type="button">Put it back</button></div>'
+    ).join("");
+  }
+
+  if (!rows.length) {
+    $("#plist").innerHTML = '<div class="card"><div class="empty">' +
+      (PROPS.length ? "No props match that filter." : "No props on the list yet.") + "</div></div>";
+    return;
+  }
+  const groups = new Map();
+  for (const m of rows) {
+    const k = propGroupKey(m);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(m);
+  }
+  const keys = [...groups.keys()];
+  if ($("#pGroupBy").value === "status") {
+    const order = ["Not decided"].concat(PSTAT.map(stLabel));
+    keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  } else if ($("#pGroupBy").value === "scene") {
+    const at = (k) => Math.min(...groups.get(k).map((m) => firstPage(m.pages)));
+    keys.sort((a, b) => at(a) - at(b) || a.localeCompare(b));
+  } else keys.sort((a, b) => a.localeCompare(b));
+
+  const thead = "<thead><tr><th>Item</th><th>Qty</th><th>Scene · pages</th><th>Used by · preset</th><th>Source · status</th><th></th></tr></thead>";
+  $("#plist").innerHTML = keys.map((k) => {
+    const list = groups.get(k);
+    const head = k === "" ? "" : '<div class="group-head"><h2>' + esc(k) + '</h2><span class="count">' +
+      list.length + (list.length === 1 ? " prop" : " props") + "</span></div>";
+    return '<section class="group">' + head + '<table class="ptable">' + thead + "<tbody>" +
+      list.map(propRow).join("") + "</tbody></table></section>";
+  }).join("");
+}
+
+function openPropForm(m) {
+  pEditingId = m ? m.id : null;
+  $("#pFormTitle").textContent = m ? "Edit prop" : "Add a prop";
+  $("#pSaveBtn").textContent = m ? "Save changes" : "Add to props";
+  $("#p_item").value = m ? m.item : "";
+  $("#p_qty").value = m ? m.qty : "1";
+  $("#p_status").value = m ? (m.source_status || "") : "";
+  $("#p_scene").value = m ? (m.scene || "") : "";
+  $("#p_pages").value = m ? (m.pages || "") : "";
+  $("#p_used").value = m ? (m.used_by || "") : "";
+  $("#p_preset").value = m ? (m.preset || "") : "";
+  $("#p_notes").value = m ? (m.notes || "") : "";
+  $("#p_by").value = (m && m.added_by) || "";
+  $("#pFormCard").hidden = false;
+  clearMsg();
+  $("#pFormCard").scrollIntoView({ block: "center", behavior: "smooth" });
+  $("#p_item").focus();
+}
+function closePropForm() { $("#pFormCard").hidden = true; pEditingId = null; }
+$("#pAddBtn").addEventListener("click", () => openPropForm(null));
+$("#pCancelBtn").addEventListener("click", closePropForm);
+
+$("#propForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (busy) return;
+  const item = $("#p_item").value.trim();
+  if (!item) { show("err", "Please name the prop."); $("#p_item").focus(); return; }
+  const body = {
+    item, qty: $("#p_qty").value, scene: $("#p_scene").value, pages: $("#p_pages").value,
+    used_by: $("#p_used").value, preset: $("#p_preset").value, source_status: $("#p_status").value,
+    notes: $("#p_notes").value, added_by: $("#p_by").value,
+  };
+  busy = true;
+  $("#pSaveBtn").disabled = true;
+  const label = $("#pSaveBtn").textContent;
+  $("#pSaveBtn").innerHTML = '<span class="spin"></span>Saving…';
+  try {
+    if (pEditingId) {
+      await api("PATCH", "/api/staff/props/" + encodeURIComponent(pEditingId), body);
+    } else {
+      const r = await fetch("/api/props", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Something went wrong. Please try again.");
+    }
+    closePropForm();
+    clearMsg();
+    await refresh();
+  } catch (err) {
+    if (err.message !== "unauthorized") show("err", esc(err.message));
+  } finally {
+    busy = false;
+    $("#pSaveBtn").disabled = false;
+    $("#pSaveBtn").textContent = label;
+  }
+});
+
+$("#plist").addEventListener("change", async (e) => {
+  const sel = e.target.closest('select[data-pact="status"]');
+  if (!sel) return;
+  const id = sel.closest("tr").dataset.id;
+  const source_status = sel.value;
+  try {
+    await api("PATCH", "/api/staff/props/" + encodeURIComponent(id), { source_status });
+    const m = PROPS.find((x) => x.id === id);
+    if (m) m.source_status = source_status;
+    renderProps();
+  } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
+});
+
+$("#plist").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-pact]");
+  if (!btn) return;
+  const id = btn.closest("tr").dataset.id;
+  const m = PROPS.find((x) => x.id === id);
+  if (!m) return;
+  if (btn.dataset.pact === "edit") { openPropForm(m); return; }
+  if (btn.dataset.pact === "del") {
+    if (!confirm('Remove "' + m.item + '" from the props list?')) return;
+    try {
+      await api("DELETE", "/api/staff/props/" + encodeURIComponent(id));
+      await refresh();
+      show("ok", "<span>Removed <b>" + esc(m.item) + "</b>.</span>" +
+        '<button class="btn btn-ghost btn-sm" id="pUndoBtn" type="button">Undo</button>');
+      const u = $("#pUndoBtn");
+      if (u) u.addEventListener("click", async () => {
+        try { await api("POST", "/api/staff/props/restore", { id }); clearMsg(); await refresh(); }
+        catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
+      });
+    } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
+  }
+});
+
+$("#pTrash").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-prestore]");
+  if (!btn) return;
+  try {
+    await api("POST", "/api/staff/props/restore", { id: btn.dataset.prestore });
+    clearMsg();
+    await refresh();
+  } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
+});
+
+for (const id of ["#pq", "#pGroupBy", "#pStatusFilter", "#pSortBy"]) {
+  $(id).addEventListener("input", renderProps);
+}
+
+// ══ Tabs (the address remembers which one: /manage#props) ═══════════════════
+function setTab(which) {
+  const props = which === "props";
+  $("#viewMaterials").hidden = props;
+  $("#viewProps").hidden = !props;
+  $("#tabMaterials").setAttribute("aria-selected", String(!props));
+  $("#tabProps").setAttribute("aria-selected", String(props));
+  clearMsg();
+}
+$("#tabMaterials").addEventListener("click", () => { history.replaceState(null, "", "#materials"); setTab("materials"); });
+$("#tabProps").addEventListener("click", () => { history.replaceState(null, "", "#props"); setTab("props"); });
+setTab(location.hash === "#props" ? "props" : "materials");
+
 // ── Gate ────────────────────────────────────────────────────────────────────
 function startPoll() {
   if (poll) clearInterval(poll);
   poll = setInterval(() => {
-    if (!$("#formCard").hidden || busy || document.hidden) return;
+    if (!$("#formCard").hidden || !$("#pFormCard").hidden || busy || document.hidden) return;
     refresh(true).catch(() => {});
   }, 20000);
 }

@@ -20,6 +20,12 @@
 //                 POST   /api/staff/restore    undo a removal
 //                 POST   /api/staff/settings   edit the list's title / notes
 //                 POST   /api/staff/key        rotate the access key
+//
+//   PROPS         GET    /api/props.csv        props list as a spreadsheet (no key)
+//                 POST   /api/props            add a prop (no key, rate limited)
+//                 PATCH  /api/staff/props/:id  edit a prop
+//                 DELETE /api/staff/props/:id  remove a prop (kept in its own undo bin)
+//                 POST   /api/staff/props/restore  undo a prop removal
 
 const http   = require('http');
 const fs     = require('fs');
@@ -43,6 +49,9 @@ const CATEGORIES = ['Lumber', 'Hardware', 'Paint & Finish', 'Tools & Equipment',
   'Props & Dressing', 'Fabric & Soft Goods', 'Electrical', 'Other'];
 const STATUSES = ['Needed', 'Have it', 'Purchased'];
 const UNASSIGNED = 'Unassigned';
+// Props: one "source · status" pick-list, exactly the six the director asked for.
+// An empty string means nobody has decided yet.
+const PROP_STATUSES = ['have', 'borrow', 'buy', 'make', 'in rehearsal', 'show-ready'];
 // Common set pieces for this show — autocomplete suggestions only. Anyone can type a
 // new one, and the pick-list always includes whatever is actually in use.
 const AREA_HINTS = ['Jessup\'s desk', 'Judge\'s box', 'Balcony', 'Courtroom', 'Barracks',
@@ -74,6 +83,20 @@ function seedItems() {
   }));
 }
 
+// Starting props, taken from the working prop list the set designer was given
+// (AFGM_Prop_List_Working.xlsx). Only used when a store has never had props.
+function seedProps() {
+  const now = new Date().toISOString();
+  let rows = [];
+  try { rows = JSON.parse(fs.readFileSync(path.join(__dirname, 'props-seed.json'), 'utf8')); }
+  catch (e) { console.error('props seed unreadable:', e.message); }
+  return rows.map(([item, qty, scene, pages, used_by, notes]) => ({
+    id: crypto.randomUUID(), item, qty: qty || '1', scene: scene || '', pages: pages || '',
+    used_by: used_by || '', preset: '', source_status: '', notes: notes || null,
+    added_by: null, created_at: now, updated_at: now,
+  }));
+}
+
 function freshStore() {
   return {
     settings: {
@@ -86,6 +109,10 @@ function freshStore() {
     //   added_by, created_at, updated_at }
     items: seedItems(),
     trash: [], // last 25 removals, so an accidental tap is recoverable
+    // { id, item, qty, scene, pages, used_by, preset, source_status, notes,
+    //   added_by, created_at, updated_at }
+    props: seedProps(),
+    props_trash: [],
   };
 }
 
@@ -99,6 +126,10 @@ function normalize(d) {
   // cleared never refills itself. Absent → this store has never existed: seed it.
   out.items = d && Array.isArray(d.items) ? d.items : base.items;
   out.trash = d && Array.isArray(d.trash) ? d.trash : [];
+  // Same rule for props: a store that predates props gets the starter list once;
+  // a props list someone emptied stays empty. Materials are never touched by this.
+  out.props = d && Array.isArray(d.props) ? d.props : base.props;
+  out.props_trash = d && Array.isArray(d.props_trash) ? d.props_trash : [];
   return out;
 }
 function load() {
@@ -268,6 +299,27 @@ function readItem(b, base) {
   return out;
 }
 
+// Props fields, same never-trust approach. qty is free text on purpose: the prop
+// list really does say "1-2", "set", "2+" and "TBD".
+function readProp(b, base) {
+  const cur = base || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const out = {};
+  out.item = has('item') ? s(b.item, 160) : cur.item;
+  out.qty = has('qty') ? (s(String(b.qty == null ? '' : b.qty), 20) || '1') : (cur.qty || '1');
+  out.scene = has('scene') ? s(b.scene, 120) : (cur.scene || '');
+  out.pages = has('pages') ? s(b.pages, 60) : (cur.pages || '');
+  out.used_by = has('used_by') ? s(b.used_by, 120) : (cur.used_by || '');
+  out.preset = has('preset') ? s(b.preset, 80) : (cur.preset || '');
+  if (has('source_status')) {
+    const st = s(b.source_status, 20).toLowerCase();
+    out.source_status = PROP_STATUSES.includes(st) ? st : '';
+  } else out.source_status = cur.source_status || '';
+  out.notes = has('notes') ? (s(b.notes, 800) || null) : (cur.notes || null);
+  out.added_by = has('added_by') ? (s(b.added_by, 80) || null) : (cur.added_by || null);
+  return out;
+}
+
 // Areas offered as autocomplete: the suggestions plus every area actually in use.
 function areaList() {
   const seen = new Set(AREA_HINTS);
@@ -279,7 +331,10 @@ function csvCell(v) {
   return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
 }
 function picks() {
-  return { categories: CATEGORIES, statuses: STATUSES, areas: areaList(), unassigned: UNASSIGNED };
+  const scenes = new Set();
+  for (const m of store.props) if (m.scene) scenes.add(m.scene);
+  return { categories: CATEGORIES, statuses: STATUSES, areas: areaList(), unassigned: UNASSIGNED,
+    prop_statuses: PROP_STATUSES, scenes: [...scenes].sort((a, b) => a.localeCompare(b)) };
 }
 
 // ── Static page serving ──────────────────────────────────────────────────────
@@ -294,7 +349,7 @@ function sendFile(res, file, type) {
 // ── Router ───────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'");
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'");
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -312,7 +367,9 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       return sendFile(res, 'staff.html', 'text/html; charset=utf-8');
     }
-    if (method === 'GET' && p === '/health') return sendJson(res, 200, { ok: true, items: store.items.length });
+    if (method === 'GET' && p === '/poster.css') return sendFile(res, 'poster.css', 'text/css; charset=utf-8');
+    if (method === 'GET' && p === '/health')
+      return sendJson(res, 200, { ok: true, items: store.items.length, props: store.props.length });
 
     // ── PUBLIC API (read the list, add to it — nothing else) ────────────────
     if (method === 'GET' && p === '/api/list') {
@@ -321,6 +378,7 @@ const server = http.createServer(async (req, res) => {
         subtitle: store.settings.subtitle,
         notes: store.settings.notes,
         items: store.items,
+        props: store.props,
       }, picks()));
     }
 
@@ -338,6 +396,35 @@ const server = http.createServer(async (req, res) => {
         'Cache-Control': 'no-store',
       });
       return res.end(lines.join('\n'));
+    }
+
+    if (method === 'GET' && p === '/api/props.csv') {
+      const cols = ['Item', 'Qty', 'Scene', 'Pages', 'Used by', 'Preset', 'Source / status', 'Notes', 'Added by', 'Added'];
+      const lines = [cols.join(',')];
+      for (const m of store.props) {
+        lines.push([m.item, m.qty, m.scene, m.pages, m.used_by, m.preset, m.source_status,
+          m.notes, m.added_by, (m.created_at || '').slice(0, 10)].map(csvCell).join(','));
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="props-list.csv"',
+        'Cache-Control': 'no-store',
+      });
+      return res.end(lines.join('\n'));
+    }
+
+    if (method === 'POST' && p === '/api/props') {
+      if (!allowAdd(clientIp(req)))
+        return sendJson(res, 429, { error: 'Too many additions from this network right now. Please wait a moment.' });
+      if (store.props.length >= 2000)
+        return sendJson(res, 409, { error: 'The props list is full (2,000 props). Ask the build lead to clear some out.' });
+      const f = readProp(await readBody(req), null);
+      if (!f.item) return sendJson(res, 400, { error: 'Please name the prop.' });
+      const now = new Date().toISOString();
+      const prop = Object.assign({ id: uuid() }, f, { created_at: now, updated_at: now });
+      store.props.push(prop);
+      save();
+      return sendJson(res, 200, { ok: true, prop });
     }
 
     if (method === 'POST' && p === '/api/items') {
@@ -369,7 +456,42 @@ const server = http.createServer(async (req, res) => {
           notes: store.settings.notes,
           items: store.items,
           trash: store.trash,
+          props: store.props,
+          props_trash: store.props_trash,
         }, picks()));
+      }
+
+      if (method === 'POST' && p === '/api/staff/props/restore') {
+        const id = s((await readBody(req)).id, 60);
+        const i = store.props_trash.findIndex((m) => m.id === id);
+        if (i === -1) return sendJson(res, 404, { error: 'Nothing left to undo for that prop.' });
+        const [back] = store.props_trash.splice(i, 1);
+        back.updated_at = new Date().toISOString();
+        store.props.push(back);
+        save();
+        return sendJson(res, 200, { ok: true, prop: back });
+      }
+
+      if (method === 'PATCH' && p.startsWith('/api/staff/props/')) {
+        const id = decodeURIComponent(p.slice('/api/staff/props/'.length));
+        const prop = store.props.find((m) => m.id === id);
+        if (!prop) return sendJson(res, 404, { error: 'That prop is no longer on the list.' });
+        const f = readProp(await readBody(req), prop);
+        if (!f.item) return sendJson(res, 400, { error: 'Please name the prop.' });
+        Object.assign(prop, f, { updated_at: new Date().toISOString() });
+        save();
+        return sendJson(res, 200, { ok: true, prop });
+      }
+
+      if (method === 'DELETE' && p.startsWith('/api/staff/props/')) {
+        const id = decodeURIComponent(p.slice('/api/staff/props/'.length));
+        const i = store.props.findIndex((m) => m.id === id);
+        if (i === -1) return sendJson(res, 404, { error: 'That prop is no longer on the list.' });
+        const [gone] = store.props.splice(i, 1);
+        store.props_trash.unshift(gone);
+        store.props_trash = store.props_trash.slice(0, 25);
+        save();
+        return sendJson(res, 200, { ok: true, id });
       }
 
       if (method === 'PATCH' && p.startsWith('/api/staff/items/')) {
