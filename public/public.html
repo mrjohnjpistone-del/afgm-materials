@@ -57,6 +57,11 @@
   .group-head{display:flex; align-items:baseline; gap:10px; margin:0 2px 8px}
   .group-head h2{font-family:var(--serif); font-size:21px; margin:0}
   .group-head .count{font-size:13px; color:var(--ink-soft)}
+  .group-head{flex-wrap:wrap; align-items:center}
+  .group-head .count{white-space:nowrap}
+  .group-head .add-here{margin-left:auto; white-space:nowrap}
+  .group-empty{border:1px dashed var(--line); border-radius:11px; padding:12px 14px; color:var(--ink-soft); font-size:14px; background:rgba(12,31,82,.45)}
+  .btn-sm{min-height:36px; padding:6px 12px; font-size:13.5px}
 
   .item{background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:13px 14px; margin-bottom:9px;
     display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:start; box-shadow:0 2px 10px rgba(50,30,10,.05)}
@@ -119,7 +124,7 @@
   .p-sub{display:block; font-size:12.5px; color:var(--ink-soft)}
   .p-qty{font-family:var(--serif); font-weight:600; font-size:17px; color:var(--gold-ink); white-space:nowrap}
   .pill{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
-    border-radius:999px; padding:3px 10px; border:1px solid var(--line); background:#0a0f1d; white-space:nowrap}
+    border-radius:999px; padding:3px 10px; border:1px solid var(--line); background:var(--field); white-space:nowrap}
   .pill.st-have,.pill.st-show-ready{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
   .pill.st-borrow,.pill.st-in-rehearsal{color:var(--gold-ink); border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
   .pill.st-buy,.pill.st-make{color:#a9bcf5; border-color:#34457a}
@@ -141,7 +146,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="/poster.css?v=2">
+<link rel="stylesheet" href="/poster.css?v=3">
 </head>
 <body>
 <header class="poster">
@@ -277,48 +282,14 @@
   <!-- ══ PROPS ══════════════════════════════════════════════════════════════ -->
   <section id="viewProps" role="tabpanel" aria-labelledby="tabProps" hidden>
   <p class="page-intro" style="text-align:center; margin:0 auto 14px">
-    Every prop the show needs, where it's used, who handles it and where it's coming from.
-    Add one if it's missing.
+    We're building the props list together. Add every prop the show needs, what scene it's in,
+    who uses it and where it's coming from.
   </p>
-  <div class="card toolbar-card">
-    <div class="toolbar">
-      <label>
-        <span class="lab">Search</span>
-        <input id="pq" type="search" placeholder="Search props, scenes, actors…" autocomplete="off">
-      </label>
-      <button class="btn btn-primary" id="pAddBtn" type="button">+ Add a prop</button>
-    </div>
-    <div class="filters">
-      <label>
-        <span class="lab">Group by</span>
-        <select id="pGroupBy">
-          <option value="scene">Scene</option>
-          <option value="status">Source · status</option>
-          <option value="used_by">Used by</option>
-          <option value="none">Nothing — one list</option>
-        </select>
-      </label>
-      <label>
-        <span class="lab">Show</span>
-        <select id="pStatusFilter"></select>
-      </label>
-      <label>
-        <span class="lab">Sort</span>
-        <select id="pSortBy">
-          <option value="pages">Script pages</option>
-          <option value="item">Item name</option>
-          <option value="newest">Newest first</option>
-        </select>
-      </label>
-    </div>
-    <div class="summary" id="pSummary"></div>
-  </div>
-
-  <div class="card" id="pFormCard" hidden>
+  <div class="card" id="pFormCard">
     <form id="propForm" novalidate>
       <h2 class="sec" style="margin:0 0 4px">Add a prop</h2>
       <p style="color:var(--ink-soft); font-size:13px; margin:0 0 14px">
-        It goes straight onto the props list. Only the props lead can change or remove it afterwards.
+        Anyone can add. It goes straight onto the list under its scene. Only the props lead can change or remove it afterwards.
       </p>
       <div class="form-grid">
         <label class="full">
@@ -362,9 +333,42 @@
       </div>
       <div style="display:flex; gap:10px; margin-top:16px">
         <button class="btn btn-primary" id="pSaveBtn" type="submit" style="flex:1">Add to props</button>
-        <button class="btn btn-ghost" id="pCancelBtn" type="button">Cancel</button>
+        <button class="btn btn-ghost" id="pCancelBtn" type="button">Clear</button>
       </div>
     </form>
+  </div>
+
+  <div class="card toolbar-card">
+    <div class="toolbar">
+      <label>
+        <span class="lab">Search</span>
+        <input id="pq" type="search" placeholder="Search props, scenes, actors…" autocomplete="off">
+      </label>
+    </div>
+    <div class="filters">
+      <label>
+        <span class="lab">Group by</span>
+        <select id="pGroupBy">
+          <option value="scene">Scene</option>
+          <option value="status">Source · status</option>
+          <option value="used_by">Used by</option>
+          <option value="none">Nothing — one list</option>
+        </select>
+      </label>
+      <label>
+        <span class="lab">Show</span>
+        <select id="pStatusFilter"></select>
+      </label>
+      <label>
+        <span class="lab">Sort</span>
+        <select id="pSortBy">
+          <option value="pages">Script pages</option>
+          <option value="item">Item name</option>
+          <option value="newest">Newest first</option>
+        </select>
+      </label>
+    </div>
+    <div class="summary" id="pSummary"></div>
   </div>
 
   <div id="plist"><div class="card"><div class="empty">Loading the props…</div></div></div>
@@ -398,7 +402,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-let ITEMS = [], CATS = [], AREAS = [], PROPS = [], PSTAT = [], SCENES = [], busy = false;
+let ITEMS = [], CATS = [], AREAS = [], PROPS = [], PSTAT = [], SCENES = [], PSCENES = [], busy = false;
 const UNASSIGNED = "Unassigned";
 
 const money = (n) => "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -438,6 +442,7 @@ async function loadList(quiet) {
     PROPS = d.props || [];
     PSTAT = d.prop_statuses || [];
     SCENES = d.scenes || [];
+    PSCENES = d.prop_scenes || [];
     if (d.title) document.title = d.title + " · Props";
     if (d.notes) $("#blurb").textContent = d.notes;
     fillSelects();
@@ -645,7 +650,9 @@ function propGroupKey(m) {
   if (g === "none") return "";
   if (g === "status") return stLabel(m.source_status);
   if (g === "used_by") return m.used_by || "Not assigned";
-  return m.scene || "No scene yet";
+  const sc = (m.scene || "").trim();
+  if (!sc) return "No scene yet";
+  return PSCENES.find((x) => x.toLowerCase() === sc.toLowerCase()) || sc;
 }
 
 function propRow(m) {
@@ -670,12 +677,15 @@ function renderProps() {
     "<span><b>" + (PROPS.length - decided) + "</b> not decided yet</span>" +
     "<span><b>" + ready + "</b> show-ready</span>";
 
-  if (!rows.length) {
+  // By scene with nothing filtered: every scene section shows, even before it has a prop.
+  const bySceneAll = $("#pGroupBy").value === "scene" && !$("#pq").value.trim() && ($("#pStatusFilter").value || "*") === "*";
+  if (!rows.length && !bySceneAll) {
     $("#plist").innerHTML = '<div class="card"><div class="empty">' +
       (PROPS.length ? "No props match that filter." : "No props on the list yet — add the first one.") + "</div></div>";
     return;
   }
   const groups = new Map();
+  if (bySceneAll) for (const sc of PSCENES) groups.set(sc, []);
   for (const m of rows) {
     const k = propGroupKey(m);
     if (!groups.has(k)) groups.set(k, []);
@@ -687,32 +697,43 @@ function renderProps() {
     keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   } else if ($("#pGroupBy").value === "scene") {
     // scenes in running order (by the earliest page any of their props appears on)
-    const at = (k) => Math.min(...groups.get(k).map((m) => firstPage(m.pages)));
-    keys.sort((a, b) => at(a) - at(b) || a.localeCompare(b));
+    // the fixed scene sections in running order, then anything else by earliest page
+    const at = (k) => Math.min(Infinity, ...groups.get(k).map((m) => firstPage(m.pages)));
+    const fixed = (k) => { const i = PSCENES.indexOf(k); return i < 0 ? 1e9 : i; };
+    const last = (k) => (k === "No scene yet" ? 1 : 0);
+    keys.sort((a, b) => fixed(a) - fixed(b) || last(a) - last(b) || at(a) - at(b) || a.localeCompare(b));
   } else keys.sort((a, b) => a.localeCompare(b));
 
   const thead = "<thead><tr><th>Item</th><th>Qty</th><th>Scene · pages</th><th>Used by · preset</th><th>Source · status</th></tr></thead>";
   $("#plist").innerHTML = keys.map((k) => {
     const list = groups.get(k);
+    const canAdd = $("#pGroupBy").value === "scene" && PSCENES.includes(k);
     const head = k === "" ? "" : '<div class="group-head"><h2>' + esc(k) + '</h2><span class="count">' +
-      list.length + (list.length === 1 ? " prop" : " props") + "</span></div>";
+      list.length + (list.length === 1 ? " prop" : " props") + "</span>" +
+      (canAdd ? '<button class="btn btn-ghost btn-sm add-here" type="button" data-scene="' + esc(k) + '">+ Add prop</button>' : "") +
+      "</div>";
+    if (!list.length) return '<section class="group">' + head + '<div class="group-empty">Nothing listed for this scene yet.</div></section>';
     return '<section class="group">' + head + '<table class="ptable">' + thead + "<tbody>" +
       list.map(propRow).join("") + "</tbody></table></section>";
   }).join("");
 }
 
-function openPropForm() {
+function resetPropForm() {
   for (const id of ["#p_item", "#p_scene", "#p_pages", "#p_used", "#p_preset", "#p_notes"]) $(id).value = "";
   $("#p_qty").value = "1";
   $("#p_status").value = "";
   $("#p_by").value = localStorage.getItem("afgm_who") || "";
-  $("#pFormCard").hidden = false;
-  clearMsg();
-  $("#pFormCard").scrollIntoView({ block: "center", behavior: "smooth" });
-  $("#p_item").focus();
 }
-$("#pAddBtn").addEventListener("click", openPropForm);
-$("#pCancelBtn").addEventListener("click", () => { $("#pFormCard").hidden = true; });
+resetPropForm();
+$("#pCancelBtn").addEventListener("click", () => { resetPropForm(); clearMsg(); });
+// "+ Add a prop here" on a scene section: jump to the form with that scene filled in
+$("#plist").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-scene]");
+  if (!b) return;
+  $("#p_scene").value = b.dataset.scene;
+  $("#pFormCard").scrollIntoView({ block: "start", behavior: "smooth" });
+  $("#p_item").focus({ preventScroll: true });
+});
 
 $("#propForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -731,7 +752,7 @@ $("#propForm").addEventListener("submit", async (e) => {
   $("#pSaveBtn").innerHTML = '<span class="spin"></span>Adding…';
   try {
     await api("POST", "/api/props", body);
-    $("#pFormCard").hidden = true;
+    resetPropForm();
     await loadList();
     show("ok", "Added <b>" + esc(item) + "</b> to the props list. Thank you.");
   } catch (err) {
@@ -763,7 +784,8 @@ setTab(location.hash === "#props" ? "props" : "materials");
 
 // Everyone is on the same list — refresh quietly, but never while someone is typing
 // into an add form (that would clobber what they are in the middle of writing).
-const formOpen = () => !$("#formCard").hidden || !$("#pFormCard").hidden;
+const propDraft = () => ["#p_item", "#p_scene", "#p_pages", "#p_used", "#p_preset", "#p_notes"].some((id) => $(id).value.trim());
+const formOpen = () => !$("#formCard").hidden || propDraft() || document.activeElement && $("#propForm").contains(document.activeElement);
 setInterval(() => {
   if (formOpen() || busy || document.hidden) return;
   loadList(true);

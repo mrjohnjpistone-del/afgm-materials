@@ -83,19 +83,16 @@ function seedItems() {
   }));
 }
 
-// Starting props, taken from the working prop list the set designer was given
-// (AFGM_Prop_List_Working.xlsx). Only used when a store has never had props.
-function seedProps() {
-  const now = new Date().toISOString();
-  let rows = [];
-  try { rows = JSON.parse(fs.readFileSync(path.join(__dirname, 'props-seed.json'), 'utf8')); }
-  catch (e) { console.error('props seed unreadable:', e.message); }
-  return rows.map(([item, qty, scene, pages, used_by, notes]) => ({
-    id: crypto.randomUUID(), item, qty: qty || '1', scene: scene || '', pages: pages || '',
-    used_by: used_by || '', preset: '', source_status: '', notes: notes || null,
-    added_by: null, created_at: now, updated_at: now,
-  }));
-}
+// The props list starts empty — the company builds it. What stays fixed are the
+// scene sections it is organised under, in running order.
+const PROP_SCENES = [
+  'Platform', "Whitaker's office", "Jessep's office", 'Softball', 'Brig', "Kaffee's office",
+  "Sam's apartment", 'Code Red struggle', 'Cell', 'Courtroom', 'Orderly room', "Kaffee's apartment",
+];
+// A starter list was auto-loaded once (all stamped with this time, nobody's name on
+// them). It was removed on request; this keeps it gone even if an old backup comes back.
+const OLD_SEED_AT = '2026-09-22T14:44:38.475Z';
+const notOldSeed = (m) => !(m && m.created_at === OLD_SEED_AT && !m.added_by);
 
 function freshStore() {
   return {
@@ -111,7 +108,7 @@ function freshStore() {
     trash: [], // last 25 removals, so an accidental tap is recoverable
     // { id, item, qty, scene, pages, used_by, preset, source_status, notes,
     //   added_by, created_at, updated_at }
-    props: seedProps(),
+    props: [],
     props_trash: [],
   };
 }
@@ -126,10 +123,8 @@ function normalize(d) {
   // cleared never refills itself. Absent → this store has never existed: seed it.
   out.items = d && Array.isArray(d.items) ? d.items : base.items;
   out.trash = d && Array.isArray(d.trash) ? d.trash : [];
-  // Same rule for props: a store that predates props gets the starter list once;
-  // a props list someone emptied stays empty. Materials are never touched by this.
-  out.props = d && Array.isArray(d.props) ? d.props : base.props;
-  out.props_trash = d && Array.isArray(d.props_trash) ? d.props_trash : [];
+  out.props = (d && Array.isArray(d.props) ? d.props : base.props).filter(notOldSeed);
+  out.props_trash = (d && Array.isArray(d.props_trash) ? d.props_trash : []).filter(notOldSeed);
   return out;
 }
 function load() {
@@ -308,6 +303,8 @@ function readProp(b, base) {
   out.item = has('item') ? s(b.item, 160) : cur.item;
   out.qty = has('qty') ? (s(String(b.qty == null ? '' : b.qty), 20) || '1') : (cur.qty || '1');
   out.scene = has('scene') ? s(b.scene, 120) : (cur.scene || '');
+  const known = PROP_SCENES.find((x) => x.toLowerCase() === out.scene.toLowerCase());
+  if (known) out.scene = known; // "courtroom" still files under Courtroom
   out.pages = has('pages') ? s(b.pages, 60) : (cur.pages || '');
   out.used_by = has('used_by') ? s(b.used_by, 120) : (cur.used_by || '');
   out.preset = has('preset') ? s(b.preset, 80) : (cur.preset || '');
@@ -331,10 +328,10 @@ function csvCell(v) {
   return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
 }
 function picks() {
-  const scenes = new Set();
+  const scenes = new Set(PROP_SCENES);
   for (const m of store.props) if (m.scene) scenes.add(m.scene);
   return { categories: CATEGORIES, statuses: STATUSES, areas: areaList(), unassigned: UNASSIGNED,
-    prop_statuses: PROP_STATUSES, scenes: [...scenes].sort((a, b) => a.localeCompare(b)) };
+    prop_statuses: PROP_STATUSES, prop_scenes: PROP_SCENES, scenes: [...scenes] };
 }
 
 // ── Static page serving ──────────────────────────────────────────────────────
