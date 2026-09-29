@@ -33,7 +33,7 @@
   input:focus,textarea:focus,select:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%,transparent)}
   button:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
   textarea{min-height:64px; resize:vertical}
-  label .lab{display:block; font-size:12px; font-weight:700; margin-bottom:5px; color:var(--ink-soft)}
+  .lab{display:block; font-size:12px; font-weight:700; margin-bottom:5px; color:var(--ink-soft)}
   label .req{color:var(--wine)}
 
   .btn{appearance:none; cursor:pointer; font:inherit; font-weight:700; border-radius:11px; text-decoration:none;
@@ -132,7 +132,7 @@
   .ptable td:first-child{border-left:4px solid var(--line); border-radius:11px 0 0 11px}
   .ptable td:last-child{border-right:1px solid var(--line); border-radius:0 11px 11px 0}
   .ptable tr[data-st="have"] td:first-child,.ptable tr[data-st="show-ready"] td:first-child{border-left-color:var(--ok)}
-  .ptable tr[data-st="borrow"] td:first-child,.ptable tr[data-st="in rehearsal"] td:first-child{border-left-color:var(--gold)}
+  .ptable tr[data-st="borrow"] td:first-child{border-left-color:var(--gold)}
   .ptable tr[data-st="buy"] td:first-child,.ptable tr[data-st="make"] td:first-child{border-left-color:#6f8ad6}
   .ptable tr[data-st=""] td:first-child{border-left-color:var(--wine)}
   .ptable{table-layout:fixed}
@@ -145,7 +145,15 @@
   .pill{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
     border-radius:999px; padding:3px 10px; border:1px solid var(--line); background:var(--field); white-space:nowrap}
   .pill.st-have,.pill.st-show-ready{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
-  .pill.st-borrow,.pill.st-in-rehearsal{color:var(--gold-ink); border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
+  .pill.st-borrow{color:var(--gold-ink); border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
+  /* One prop can belong to several scenes, so each scene reads as its own tag. */
+  .scn{display:inline-block; font-size:11.5px; line-height:1.5; background:var(--field); border:1px solid var(--line);
+    border-radius:6px; padding:1px 7px; margin:0 4px 4px 0; white-space:nowrap}
+  .scenepick{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:6px 10px; margin:2px 0 8px}
+  .scenepick label{display:flex; align-items:center; gap:8px; font-size:13.5px; background:var(--field);
+    border:1px solid var(--line); border-radius:9px; padding:7px 10px; cursor:pointer}
+  .scenepick input{accent-color:var(--gold); width:15px; height:15px; flex:none; margin:0}
+  .scenepick label:has(input:checked){border-color:var(--gold); color:var(--gold-ink)}
   .pill.st-buy,.pill.st-make{color:#a9bcf5; border-color:#34457a}
   .pill.st-none{color:var(--wine-ink); border-color:color-mix(in srgb,var(--wine) 45%,var(--line))}
   @media (max-width:680px){
@@ -154,7 +162,7 @@
     .ptable tr{background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--wine); border-radius:12px;
       padding:10px 12px; margin-bottom:9px}
     .ptable tr[data-st="have"],.ptable tr[data-st="show-ready"]{border-left-color:var(--ok)}
-    .ptable tr[data-st="borrow"],.ptable tr[data-st="in rehearsal"]{border-left-color:var(--gold)}
+    .ptable tr[data-st="borrow"]{border-left-color:var(--gold)}
     .ptable tr[data-st="buy"],.ptable tr[data-st="make"]{border-left-color:#6f8ad6}
     .ptable td{border:0 !important; border-radius:0 !important; background:none; padding:3px 0}
     .ptable td[data-label]::before{content:attr(data-label); display:inline-block; min-width:118px;
@@ -368,13 +376,8 @@
     </div>
     <div class="filters">
       <label>
-        <span class="lab">Group by</span>
-        <select id="pGroupBy">
-          <option value="scene">Scene</option>
-          <option value="status">Source · status</option>
-          <option value="used_by">Used by</option>
-          <option value="none">Nothing — one list</option>
-        </select>
+        <span class="lab">Scene</span>
+        <select id="pSceneFilter"></select>
       </label>
       <label>
         <span class="lab">Show</span>
@@ -383,6 +386,7 @@
       <label>
         <span class="lab">Sort</span>
         <select id="pSortBy">
+          <option value="scene">Scene order</option>
           <option value="pages">Script pages</option>
           <option value="item">Item name</option>
           <option value="newest">Newest first</option>
@@ -412,11 +416,11 @@
           <span class="lab">Source · status</span>
           <select id="p_status"></select>
         </label>
-        <label>
-          <span class="lab">Scene</span>
-          <input id="p_scene" maxlength="120" list="scenes">
-          <datalist id="scenes"></datalist>
-        </label>
+        <div class="full">
+          <span class="lab">Scenes — tick every scene this prop is used in</span>
+          <div class="scenepick" id="p_scenes"></div>
+          <input id="p_scene_other" maxlength="240" placeholder="Any other scene not listed above (separate several with commas)">
+        </div>
         <label>
           <span class="lab">Script pages</span>
           <input id="p_pages" maxlength="60" placeholder="e.g. 55-96">
@@ -479,8 +483,11 @@ const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) =>
 const KEYNAME = "afgm_materials_key";
 let KEY = localStorage.getItem(KEYNAME) || (new URLSearchParams(location.search).get("key") || "");
 let ITEMS = [], TRASH = [], CATS = [], STATUSES = [], AREAS = [], editingId = null, busy = false, poll = null;
-let PROPS = [], PTRASH = [], PSTAT = [], SCENES = [], PSCENES = [], pEditingId = null;
-const stLabel = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "Not decided";
+let PROPS = [], PTRASH = [], PSTAT = [], PLAB = {}, SCENES = [], PSCENES = [], pEditingId = null;
+// The wording comes from the server so the list and the spreadsheet always agree.
+const stLabel = (s) => (s ? (PLAB[s] || s.charAt(0).toUpperCase() + s.slice(1)) : "Not decided");
+const NO_SCENE = "No scene yet";
+const scenesOf = (m) => (Array.isArray(m.scenes) ? m.scenes : []);
 const firstPage = (p) => { const m = String(p || "").match(/\d+/); return m ? Number(m[0]) : 9999; };
 const UNASSIGNED = "Unassigned";
 
@@ -531,6 +538,7 @@ async function refresh(quiet) {
   PROPS = d.props || [];
   PTRASH = d.props_trash || [];
   PSTAT = d.prop_statuses || [];
+  PLAB = d.prop_status_labels || {};
   SCENES = d.scenes || [];
   PSCENES = d.prop_scenes || [];
   if (d.title) {
@@ -554,15 +562,34 @@ function fillSelects() {
     st.innerHTML = STATUSES.map((c) => '<option value="' + esc(c) + '">' + esc(c) + "</option>").join("");
   }
   $("#areas").innerHTML = AREAS.map((a) => "<option>" + esc(a) + "</option>").join("");
-  $("#scenes").innerHTML = SCENES.map((a) => "<option>" + esc(a) + "</option>").join("");
+  // Tick-boxes for the fixed scenes; anything typed once by someone else shows too.
+  const boxes = $("#p_scenes");
+  const want = PSCENES.concat(SCENES.filter((s) => !PSCENES.includes(s)));
+  if (boxes.dataset.list !== want.join("|")) {
+    const keep = pickedScenes();
+    boxes.dataset.list = want.join("|");
+    boxes.innerHTML = want.map((s) =>
+      '<label><input type="checkbox" value="' + esc(s) + '">' + esc(s) + "</label>").join("");
+    setPickedScenes(keep);
+  }
+  const scf = $("#pSceneFilter");
+  const scfWant = "*|" + want.join("|");
+  if (scf.dataset.list !== scfWant) {
+    const was = scf.value;
+    scf.dataset.list = scfWant;
+    scf.innerHTML = '<option value="*">Every scene</option>' +
+      want.map((s) => '<option value="' + esc(s) + '">' + esc(s) + "</option>").join("") +
+      '<option value="">' + NO_SCENE + "</option>";
+    if (was) scf.value = was;
+  }
   const ps = $("#p_status");
   if (ps.options.length !== PSTAT.length + 1) {
-    ps.innerHTML = '<option value="">Not decided yet</option>' +
+    ps.innerHTML = '<option value="">Not decided</option>' +
       PSTAT.map((c) => '<option value="' + esc(c) + '">' + esc(stLabel(c)) + "</option>").join("");
   }
   const pf = $("#pStatusFilter");
   if (pf.options.length !== PSTAT.length + 2) {
-    pf.innerHTML = '<option value="*">Everything</option><option value="">Not decided yet</option>' +
+    pf.innerHTML = '<option value="*">Everything</option><option value="">Not decided</option>' +
       PSTAT.map((c) => '<option value="' + esc(c) + '">' + esc(stLabel(c)) + "</option>").join("");
   }
 }
@@ -841,16 +868,31 @@ for (const id of ["#q", "#groupBy", "#statusFilter", "#sortBy"]) {
 }
 
 // ══ Props ════════════════════════════════════════════════════════════════════
+// Where a prop sits in the running order: the earliest scene it is used in.
+function sceneOrder(m) {
+  let best = 1e9;
+  for (const sc of scenesOf(m)) {
+    const i = PSCENES.findIndex((x) => x.toLowerCase() === sc.toLowerCase());
+    if (i >= 0 && i < best) best = i;
+  }
+  return best;
+}
+
 function visibleProps() {
   const q = $("#pq").value.trim().toLowerCase();
   const sf = $("#pStatusFilter").value;
+  const scf = $("#pSceneFilter").value;
   const out = PROPS.filter((m) => {
     if (sf !== "*" && (m.source_status || "") !== sf) return false;
+    const scenes = scenesOf(m);
+    if (scf === "") { if (scenes.length) return false; }
+    else if (scf && scf !== "*" && !scenes.some((s) => s.toLowerCase() === scf.toLowerCase())) return false;
     if (!q) return true;
-    return [m.item, m.scene, m.pages, m.used_by, m.preset, m.notes, m.added_by]
+    return [m.item, scenes.join(" "), m.pages, m.used_by, m.preset, m.notes, m.added_by]
       .filter(Boolean).join(" ").toLowerCase().includes(q);
   });
   const cmp = {
+    scene: (a, b) => sceneOrder(a) - sceneOrder(b) || firstPage(a.pages) - firstPage(b.pages) || a.item.localeCompare(b.item),
     pages: (a, b) => firstPage(a.pages) - firstPage(b.pages) || a.item.localeCompare(b.item),
     item: (a, b) => a.item.localeCompare(b.item),
     newest: (a, b) => (b.created_at || "").localeCompare(a.created_at || ""),
@@ -858,28 +900,42 @@ function visibleProps() {
   return out.sort(cmp);
 }
 
-function propGroupKey(m) {
-  const g = $("#pGroupBy").value;
-  if (g === "none") return "";
-  if (g === "status") return stLabel(m.source_status);
-  if (g === "used_by") return m.used_by || "Not assigned";
-  const sc = (m.scene || "").trim();
-  if (!sc) return "No scene yet";
-  return PSCENES.find((x) => x.toLowerCase() === sc.toLowerCase()) || sc;
+function sceneTags(m) {
+  const scenes = scenesOf(m);
+  if (!scenes.length) return '<span class="p-sub">—</span>';
+  return scenes.map((s) => '<span class="scn">' + esc(s) + "</span>").join("");
+}
+
+// The scene picker on the add/edit form
+const sceneBoxes = () => [...document.querySelectorAll("#p_scenes input")];
+function pickedScenes() {
+  const out = sceneBoxes().filter((b) => b.checked).map((b) => b.value);
+  for (const one of $("#p_scene_other").value.split(",")) {
+    const t = one.trim();
+    if (t && !out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
+}
+function setPickedScenes(list) {
+  const names = (list || []).map(String);
+  const lower = names.map((n) => n.toLowerCase());
+  for (const b of sceneBoxes()) b.checked = lower.includes(b.value.toLowerCase());
+  const known = sceneBoxes().map((b) => b.value.toLowerCase());
+  $("#p_scene_other").value = names.filter((n) => !known.includes(n.toLowerCase())).join(", ");
 }
 
 function propRow(m) {
-  const scene = [m.scene, m.pages ? "pp. " + m.pages : ""].filter(Boolean);
   const used = [m.used_by, m.preset ? "preset " + m.preset : ""].filter(Boolean);
   const opts = ['<option value=""' + (m.source_status ? "" : " selected") + ">Not decided</option>"].concat(
     PSTAT.map((s) => '<option value="' + esc(s) + '"' + (s === m.source_status ? " selected" : "") + ">" +
       esc(stLabel(s)) + "</option>")).join("");
   return '<tr data-st="' + esc(m.source_status || "") + '" data-id="' + esc(m.id) + '">' +
     '<td><span class="p-item">' + esc(m.item) + "</span>" +
+      (m.pages ? '<span class="p-sub">pp. ' + esc(m.pages) + "</span>" : "") +
       (m.notes ? '<span class="p-sub">' + esc(m.notes) + "</span>" : "") +
       (m.added_by ? '<span class="p-sub">added by ' + esc(m.added_by) + "</span>" : "") + "</td>" +
     '<td data-label="Qty"><span class="p-qty">' + esc(m.qty) + "</span></td>" +
-    '<td data-label="Scene · pages">' + (scene.length ? esc(scene.join(" · ")) : '<span class="p-sub">—</span>') + "</td>" +
+    '<td data-label="Scenes">' + sceneTags(m) + "</td>" +
     '<td data-label="Used by · preset">' + (used.length ? esc(used.join(" · ")) : '<span class="p-sub">—</span>') + "</td>" +
     '<td data-label="Source · status"><label class="sr" for="ps-' + esc(m.id) + '">Source and status for ' + esc(m.item) +
       '</label><select id="ps-' + esc(m.id) + '" data-pact="status">' + opts + "</select></td>" +
@@ -891,7 +947,9 @@ function renderProps() {
   const rows = visibleProps();
   const decided = PROPS.filter((m) => m.source_status).length;
   const ready = PROPS.filter((m) => m.source_status === "show-ready").length;
+  const filtered = rows.length !== PROPS.length;
   $("#pSummary").innerHTML = "<span><b>" + PROPS.length + "</b> props on the list</span>" +
+    (filtered ? "<span><b>" + rows.length + "</b> shown</span>" : "") +
     "<span><b>" + (PROPS.length - decided) + "</b> not decided yet</span>" +
     "<span><b>" + ready + "</b> show-ready</span>";
 
@@ -900,44 +958,21 @@ function renderProps() {
     $("#pTrashCard").hidden = false;
     $("#pTrash").innerHTML = PTRASH.map((m) =>
       '<div class="trash-row"><span>' + esc(m.qty) + " · <b>" + esc(m.item) + "</b>" +
-      (m.scene ? " · " + esc(m.scene) : "") + "</span>" +
+      (scenesOf(m).length ? " · " + esc(scenesOf(m).join(", ")) : "") + "</span>" +
       '<button class="btn btn-ghost btn-sm" data-prestore="' + esc(m.id) + '" type="button">Put it back</button></div>'
     ).join("");
   }
 
-  const bySceneAll = $("#pGroupBy").value === "scene" && !$("#pq").value.trim() && ($("#pStatusFilter").value || "*") === "*";
-  if (!rows.length && !bySceneAll) {
+  if (!rows.length) {
     $("#plist").innerHTML = '<div class="card"><div class="empty">' +
       (PROPS.length ? "No props match that filter." : "No props on the list yet.") + "</div></div>";
     return;
   }
-  const groups = new Map();
-  if (bySceneAll) for (const sc of PSCENES) groups.set(sc, []);
-  for (const m of rows) {
-    const k = propGroupKey(m);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(m);
-  }
-  const keys = [...groups.keys()];
-  if ($("#pGroupBy").value === "status") {
-    const order = ["Not decided"].concat(PSTAT.map(stLabel));
-    keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  } else if ($("#pGroupBy").value === "scene") {
-    const at = (k) => Math.min(Infinity, ...groups.get(k).map((m) => firstPage(m.pages)));
-    const fixed = (k) => { const i = PSCENES.indexOf(k); return i < 0 ? 1e9 : i; };
-    const last = (k) => (k === "No scene yet" ? 1 : 0);
-    keys.sort((a, b) => fixed(a) - fixed(b) || last(a) - last(b) || at(a) - at(b) || a.localeCompare(b));
-  } else keys.sort((a, b) => a.localeCompare(b));
-
-  const thead = "<thead><tr><th>Item</th><th>Qty</th><th>Scene · pages</th><th>Used by · preset</th><th>Source · status</th><th></th></tr></thead>";
-  $("#plist").innerHTML = keys.map((k) => {
-    const list = groups.get(k);
-    const head = k === "" ? "" : '<div class="group-head"><h2>' + esc(k) + '</h2><span class="count">' +
-      list.length + (list.length === 1 ? " prop" : " props") + "</span></div>";
-    if (!list.length) return '<section class="group">' + head + '<div class="group-empty">Nothing listed for this scene yet.</div></section>';
-    return '<section class="group">' + head + '<table class="ptable">' + thead + "<tbody>" +
-      list.map(propRow).join("") + "</tbody></table></section>";
-  }).join("");
+  // One table, always. The scene picker filters it instead of splitting it up, because a
+  // prop can now belong to several scenes at once.
+  const thead = "<thead><tr><th>Item</th><th>Qty</th><th>Scenes</th><th>Used by · preset</th><th>Source · status</th><th></th></tr></thead>";
+  $("#plist").innerHTML = '<table class="ptable">' + thead + "<tbody>" +
+    rows.map(propRow).join("") + "</tbody></table>";
 }
 
 function openPropForm(m) {
@@ -947,7 +982,7 @@ function openPropForm(m) {
   $("#p_item").value = m ? m.item : "";
   $("#p_qty").value = m ? m.qty : "1";
   $("#p_status").value = m ? (m.source_status || "") : "";
-  $("#p_scene").value = m ? (m.scene || "") : "";
+  setPickedScenes(m ? scenesOf(m) : []);
   $("#p_pages").value = m ? (m.pages || "") : "";
   $("#p_used").value = m ? (m.used_by || "") : "";
   $("#p_preset").value = m ? (m.preset || "") : "";
@@ -968,7 +1003,7 @@ $("#propForm").addEventListener("submit", async (e) => {
   const item = $("#p_item").value.trim();
   if (!item) { show("err", "Please name the prop."); $("#p_item").focus(); return; }
   const body = {
-    item, qty: $("#p_qty").value, scene: $("#p_scene").value, pages: $("#p_pages").value,
+    item, qty: $("#p_qty").value, scenes: pickedScenes(), pages: $("#p_pages").value,
     used_by: $("#p_used").value, preset: $("#p_preset").value, source_status: $("#p_status").value,
     notes: $("#p_notes").value, added_by: $("#p_by").value,
   };
@@ -1044,7 +1079,7 @@ $("#pTrash").addEventListener("click", async (e) => {
   } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
 });
 
-for (const id of ["#pq", "#pGroupBy", "#pStatusFilter", "#pSortBy"]) {
+for (const id of ["#pq", "#pSceneFilter", "#pStatusFilter", "#pSortBy"]) {
   $(id).addEventListener("input", renderProps);
 }
 

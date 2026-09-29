@@ -49,9 +49,13 @@ const CATEGORIES = ['Lumber', 'Hardware', 'Paint & Finish', 'Tools & Equipment',
   'Props & Dressing', 'Fabric & Soft Goods', 'Electrical', 'Other'];
 const STATUSES = ['Needed', 'Have it', 'Purchased'];
 const UNASSIGNED = 'Unassigned';
-// Props: one "source · status" pick-list, exactly the six the director asked for.
-// An empty string means nobody has decided yet.
-const PROP_STATUSES = ['have', 'borrow', 'buy', 'make', 'in rehearsal', 'show-ready'];
+// Props: one "source · status" pick-list, in the director's words.
+// An empty string means nobody has decided yet ("Not decided").
+const PROP_STATUSES = ['have', 'borrow', 'buy', 'make', 'show-ready'];
+const PROP_STATUS_LABELS = {
+  have: 'Have', borrow: 'Need to borrow', buy: 'Need to buy',
+  make: 'Need to make', 'show-ready': 'Show ready',
+};
 // Common set pieces for this show — autocomplete suggestions only. Anyone can type a
 // new one, and the pick-list always includes whatever is actually in use.
 const AREA_HINTS = ['Jessup\'s desk', 'Judge\'s box', 'Balcony', 'Courtroom', 'Barracks',
@@ -106,11 +110,22 @@ function freshStore() {
     //   added_by, created_at, updated_at }
     items: seedItems(),
     trash: [], // last 25 removals, so an accidental tap is recoverable
-    // { id, item, qty, scene, pages, used_by, preset, source_status, notes,
+    // { id, item, qty, scenes: [], pages, used_by, preset, source_status, notes,
     //   added_by, created_at, updated_at }
     props: [],
     props_trash: [],
   };
+}
+
+// Rows written by earlier versions: a single `scene` string became a `scenes` list, and
+// the old "in rehearsal" pick is gone, so those fall back to "Not decided".
+function upgradeProp(m) {
+  if (!m || typeof m !== 'object') return m;
+  const out = Object.assign({}, m);
+  if (!Array.isArray(out.scenes)) out.scenes = cleanScenes(out.scene || '');
+  delete out.scene;
+  if (out.source_status && !PROP_STATUSES.includes(out.source_status)) out.source_status = '';
+  return out;
 }
 
 // ── Storage: one JSON file, atomic writes, serialized so writes never interleave ──
@@ -123,7 +138,7 @@ function normalize(d) {
   // cleared never refills itself. Absent → this store has never existed: seed it.
   out.items = d && Array.isArray(d.items) ? d.items : base.items;
   out.trash = d && Array.isArray(d.trash) ? d.trash : [];
-  out.props = (d && Array.isArray(d.props) ? d.props : base.props).filter(notOldSeed);
+  out.props = (d && Array.isArray(d.props) ? d.props : base.props).filter(notOldSeed).map(upgradeProp);
   out.props_trash = (d && Array.isArray(d.props_trash) ? d.props_trash : []).filter(notOldSeed);
   return out;
 }
@@ -294,6 +309,27 @@ function readItem(b, base) {
   return out;
 }
 
+// Scenes arrive as an array or as a comma-separated string. Trim, drop blanks and
+// duplicates, and snap anything that matches a known scene to its canonical spelling
+// ("courtroom" files under Courtroom).
+function cleanScenes(v) {
+  const raw = Array.isArray(v) ? v : String(v == null ? '' : v).split(',');
+  const out = [];
+  for (const one of raw) {
+    let name = s(one, 120);
+    if (!name) continue;
+    const known = PROP_SCENES.find((x) => x.toLowerCase() === name.toLowerCase());
+    if (known) name = known;
+    if (!out.some((x) => x.toLowerCase() === name.toLowerCase())) out.push(name);
+    if (out.length >= 20) break;
+  }
+  // Fixed scenes first, in running order; anything else after, as typed.
+  return out.sort((a, b) => {
+    const ia = PROP_SCENES.indexOf(a), ib = PROP_SCENES.indexOf(b);
+    return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib);
+  });
+}
+
 // Props fields, same never-trust approach. qty is free text on purpose: the prop
 // list really does say "1-2", "set", "2+" and "TBD".
 function readProp(b, base) {
@@ -302,9 +338,11 @@ function readProp(b, base) {
   const out = {};
   out.item = has('item') ? s(b.item, 160) : cur.item;
   out.qty = has('qty') ? (s(String(b.qty == null ? '' : b.qty), 20) || '1') : (cur.qty || '1');
-  out.scene = has('scene') ? s(b.scene, 120) : (cur.scene || '');
-  const known = PROP_SCENES.find((x) => x.toLowerCase() === out.scene.toLowerCase());
-  if (known) out.scene = known; // "courtroom" still files under Courtroom
+  // A prop can live in several scenes (file folders turn up in three of them), so the
+  // field is a list. A plain `scene` string is still accepted — older rows and links use it.
+  out.scenes = has('scenes') || has('scene')
+    ? cleanScenes(has('scenes') ? b.scenes : b.scene)
+    : (cur.scenes || []);
   out.pages = has('pages') ? s(b.pages, 60) : (cur.pages || '');
   out.used_by = has('used_by') ? s(b.used_by, 120) : (cur.used_by || '');
   out.preset = has('preset') ? s(b.preset, 80) : (cur.preset || '');
@@ -329,9 +367,10 @@ function csvCell(v) {
 }
 function picks() {
   const scenes = new Set(PROP_SCENES);
-  for (const m of store.props) if (m.scene) scenes.add(m.scene);
+  for (const m of store.props) for (const sc of m.scenes || []) scenes.add(sc);
   return { categories: CATEGORIES, statuses: STATUSES, areas: areaList(), unassigned: UNASSIGNED,
-    prop_statuses: PROP_STATUSES, prop_scenes: PROP_SCENES, scenes: [...scenes] };
+    prop_statuses: PROP_STATUSES, prop_status_labels: PROP_STATUS_LABELS,
+    prop_scenes: PROP_SCENES, scenes: [...scenes] };
 }
 
 // ── Static page serving ──────────────────────────────────────────────────────
@@ -396,10 +435,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'GET' && p === '/api/props.csv') {
-      const cols = ['Item', 'Qty', 'Scene', 'Pages', 'Used by', 'Preset', 'Source / status', 'Notes', 'Added by', 'Added'];
+      const cols = ['Item', 'Qty', 'Scenes', 'Pages', 'Used by', 'Preset', 'Source / status', 'Notes', 'Added by', 'Added'];
       const lines = [cols.join(',')];
       for (const m of store.props) {
-        lines.push([m.item, m.qty, m.scene, m.pages, m.used_by, m.preset, m.source_status,
+        lines.push([m.item, m.qty, (m.scenes || []).join('; '), m.pages, m.used_by, m.preset,
+          PROP_STATUS_LABELS[m.source_status] || 'Not decided',
           m.notes, m.added_by, (m.created_at || '').slice(0, 10)].map(csvCell).join(','));
       }
       res.writeHead(200, {
