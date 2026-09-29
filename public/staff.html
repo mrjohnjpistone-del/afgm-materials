@@ -455,6 +455,7 @@
   <div class="card" id="pTrashCard" hidden style="margin-top:22px">
     <h2 class="sec">Recently removed props</h2>
     <div id="pTrash"></div>
+    <button class="btn btn-ghost btn-sm" id="pForgetBtn" type="button" style="margin-top:10px">Clear this list</button>
   </div>
   </section>
 
@@ -1031,6 +1032,14 @@ $("#propForm").addEventListener("submit", async (e) => {
     $("#pSaveBtn").disabled = false;
     $("#pSaveBtn").textContent = label;
   }
+});
+
+$("#pForgetBtn").addEventListener("click", async () => {
+  if (!confirm("Clear the removed list? The props themselves stay removed \u2014 this only stops offering to put them back.")) return;
+  try {
+    await api("POST", "/api/staff/props/forget", {});
+    await refresh();
+  } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
 });
 
 $("#plist").addEventListener("change", async (e) => {

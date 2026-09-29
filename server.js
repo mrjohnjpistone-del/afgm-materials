@@ -26,6 +26,7 @@
 //                 PATCH  /api/staff/props/:id  edit a prop
 //                 DELETE /api/staff/props/:id  remove a prop (kept in its own undo bin)
 //                 POST   /api/staff/props/restore  undo a prop removal
+//                 POST   /api/staff/props/forget   clear the removed list (all, or one id)
 
 const http   = require('http');
 const fs     = require('fs');
@@ -507,6 +508,16 @@ const server = http.createServer(async (req, res) => {
         store.props.push(back);
         save();
         return sendJson(res, 200, { ok: true, prop: back });
+      }
+
+      // Nothing waiting to be undone any more: let the props lead clear the list out.
+      if (method === 'POST' && p === '/api/staff/props/forget') {
+        const id = s((await readBody(req)).id, 60);
+        const before = store.props_trash.length;
+        store.props_trash = id ? store.props_trash.filter((m) => m.id !== id) : [];
+        if (before === store.props_trash.length) return sendJson(res, 404, { error: 'Nothing to forget.' });
+        save();
+        return sendJson(res, 200, { ok: true, props_trash: store.props_trash });
       }
 
       if (method === 'PATCH' && p.startsWith('/api/staff/props/')) {
