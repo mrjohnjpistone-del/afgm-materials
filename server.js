@@ -111,8 +111,8 @@ function freshStore() {
     //   added_by, created_at, updated_at }
     items: seedItems(),
     trash: [], // last 25 removals, so an accidental tap is recoverable
-    // { id, item, qty, scenes: [], pages, used_by, preset, source_status, notes,
-    //   added_by, created_at, updated_at }
+    // { id, item, qty, scenes: [], pages, used_by, preset, source_status,
+    //   borrowed_from, return_to, notes, added_by, created_at, updated_at }
     props: [],
     props_trash: [],
   };
@@ -126,6 +126,8 @@ function upgradeProp(m) {
   if (!Array.isArray(out.scenes)) out.scenes = cleanScenes(out.scene || '');
   delete out.scene;
   if (out.source_status && !PROP_STATUSES.includes(out.source_status)) out.source_status = '';
+  // There is only one prop table in this build, so old SL/SR presets collapse onto it.
+  if (/^\s*(SL|SR)\s+prop\s+table\s*$/i.test(out.preset || '')) out.preset = 'Prop table';
   return out;
 }
 
@@ -351,6 +353,9 @@ function readProp(b, base) {
     const st = s(b.source_status, 20).toLowerCase();
     out.source_status = PROP_STATUSES.includes(st) ? st : '';
   } else out.source_status = cur.source_status || '';
+  // Anything borrowed has to go home again, so we keep the lender and the return plan.
+  out.borrowed_from = has('borrowed_from') ? s(b.borrowed_from, 160) : (cur.borrowed_from || '');
+  out.return_to = has('return_to') ? s(b.return_to, 160) : (cur.return_to || '');
   out.notes = has('notes') ? (s(b.notes, 800) || null) : (cur.notes || null);
   out.added_by = has('added_by') ? (s(b.added_by, 80) || null) : (cur.added_by || null);
   return out;
@@ -436,11 +441,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'GET' && p === '/api/props.csv') {
-      const cols = ['Item', 'Qty', 'Scenes', 'Pages', 'Used by', 'Preset', 'Source / status', 'Notes', 'Added by', 'Added'];
+      const cols = ['Item', 'Qty', 'Scenes', 'Pages', 'Used by', 'Preset', 'Source / status',
+        'Borrowed from', 'Return to', 'Notes', 'Added by', 'Added'];
       const lines = [cols.join(',')];
       for (const m of store.props) {
         lines.push([m.item, m.qty, (m.scenes || []).join('; '), m.pages, m.used_by, m.preset,
-          PROP_STATUS_LABELS[m.source_status] || 'Not decided',
+          PROP_STATUS_LABELS[m.source_status] || 'Not decided', m.borrowed_from, m.return_to,
           m.notes, m.added_by, (m.created_at || '').slice(0, 10)].map(csvCell).join(','));
       }
       res.writeHead(200, {

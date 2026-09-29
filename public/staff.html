@@ -149,7 +149,8 @@
   /* One prop can belong to several scenes, so each scene reads as its own tag. */
   .scn{display:inline-block; font-size:11.5px; line-height:1.5; background:var(--field); border:1px solid var(--line);
     border-radius:6px; padding:1px 7px; margin:0 4px 4px 0; white-space:nowrap}
-  .scenepick{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:6px 10px; margin:2px 0 8px}
+  .borrowgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:8px}
+.scenepick{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:6px 10px; margin:2px 0 8px}
   .scenepick label{display:flex; align-items:center; gap:8px; font-size:13.5px; background:var(--field);
     border:1px solid var(--line); border-radius:9px; padding:7px 10px; cursor:pointer}
   .scenepick input{accent-color:var(--gold); width:15px; height:15px; flex:none; margin:0}
@@ -431,9 +432,16 @@
         </label>
         <label>
           <span class="lab">Preset</span>
-          <input id="p_preset" maxlength="80" list="presets" placeholder="SL table, SR table, onstage…">
-          <datalist id="presets"><option>SL prop table</option><option>SR prop table</option><option>Onstage</option><option>Personal prop</option></datalist>
+          <input id="p_preset" maxlength="80" list="presets" placeholder="Prop table, onstage, personal…">
+          <datalist id="presets"><option>Prop table</option><option>Onstage</option><option>Personal prop</option><option>Offstage</option></datalist>
         </label>
+        <div class="full" id="p_borrow" hidden>
+          <span class="lab">Borrowed &mdash; where it came from, and where it goes back</span>
+          <div class="borrowgrid">
+            <input id="p_from" maxlength="160" placeholder="Borrowed from (person, school, theatre&hellip;)">
+            <input id="p_return" maxlength="160" placeholder="Return to (person, address, when)">
+          </div>
+        </div>
         <label class="full">
           <span class="lab">Notes</span>
           <textarea id="p_notes" maxlength="800"></textarea>
@@ -917,6 +925,22 @@ function pickedScenes() {
   }
   return out;
 }
+// A borrowed prop has to go home again, so the two boxes appear as soon as the status
+// says borrow (and stay put whenever either one already has something in it).
+function syncBorrow() {
+  const on = $("#p_status").value === "borrow" ||
+    $("#p_from").value.trim() !== "" || $("#p_return").value.trim() !== "";
+  $("#p_borrow").hidden = !on;
+}
+
+// Show the lender and the return plan wherever the prop is listed, not just in the form.
+function borrowNote(m) {
+  const bits = [];
+  if (m.borrowed_from) bits.push("from " + m.borrowed_from);
+  if (m.return_to) bits.push("back to " + m.return_to);
+  return bits.length ? '<span class="p-sub">' + esc(bits.join(" \u00b7 ")) + "</span>" : "";
+}
+
 function setPickedScenes(list) {
   const names = (list || []).map(String);
   const lower = names.map((n) => n.toLowerCase());
@@ -939,7 +963,8 @@ function propRow(m) {
     '<td data-label="Scenes">' + sceneTags(m) + "</td>" +
     '<td data-label="Used by · preset">' + (used.length ? esc(used.join(" · ")) : '<span class="p-sub">—</span>') + "</td>" +
     '<td data-label="Source · status"><label class="sr" for="ps-' + esc(m.id) + '">Source and status for ' + esc(m.item) +
-      '</label><select id="ps-' + esc(m.id) + '" data-pact="status">' + opts + "</select></td>" +
+      '</label><select id="ps-' + esc(m.id) + '" data-pact="status">' + opts + "</select>" +
+      borrowNote(m) + "</td>" +
     '<td><div class="p-acts"><button class="btn btn-ghost btn-sm" data-pact="edit" type="button">Edit</button>' +
       '<button class="btn btn-danger btn-sm" data-pact="del" type="button">Remove</button></div></td></tr>';
 }
@@ -987,6 +1012,9 @@ function openPropForm(m) {
   $("#p_pages").value = m ? (m.pages || "") : "";
   $("#p_used").value = m ? (m.used_by || "") : "";
   $("#p_preset").value = m ? (m.preset || "") : "";
+  $("#p_from").value = m ? (m.borrowed_from || "") : "";
+  $("#p_return").value = m ? (m.return_to || "") : "";
+  syncBorrow();
   $("#p_notes").value = m ? (m.notes || "") : "";
   $("#p_by").value = (m && m.added_by) || "";
   $("#pFormCard").hidden = false;
@@ -995,6 +1023,7 @@ function openPropForm(m) {
   $("#p_item").focus();
 }
 function closePropForm() { $("#pFormCard").hidden = true; pEditingId = null; }
+$("#p_status").addEventListener("change", syncBorrow);
 $("#pAddBtn").addEventListener("click", () => openPropForm(null));
 $("#pCancelBtn").addEventListener("click", closePropForm);
 
@@ -1006,6 +1035,7 @@ $("#propForm").addEventListener("submit", async (e) => {
   const body = {
     item, qty: $("#p_qty").value, scenes: pickedScenes(), pages: $("#p_pages").value,
     used_by: $("#p_used").value, preset: $("#p_preset").value, source_status: $("#p_status").value,
+    borrowed_from: $("#p_from").value, return_to: $("#p_return").value,
     notes: $("#p_notes").value, added_by: $("#p_by").value,
   };
   busy = true;
