@@ -179,6 +179,7 @@ let restoreDone = !MIRRORED || hadLocalFile; // a disk that survived needs no re
 let mirrorShut  = false;                     // a failed read closes the mirror for this boot
 let pushWaiting = false;
 let pushTimer   = null;
+let restoreTry  = 0;
 
 function pushBackup(now) {
   if (!MIRRORED || mirrorShut) return;
@@ -219,9 +220,15 @@ async function restoreFromBackup() {
     if (!hadLocalFile && !writes) save(); // put the restored copy on the local disk
     if (pushWaiting) { pushWaiting = false; pushBackup(); }
   } catch (e) {
-    // Pushing now could replace a perfectly good stored copy with the starter list.
-    mirrorShut = true;
-    console.error('restore failed, so nothing will be pushed to the mirror this run:', e.message);
+    // Keep trying rather than giving up on the first stumble. The mirror lives on
+    // another service, so a redeploy or a cold start over there can make one read
+    // fail for a few seconds; a boot that quit at that point would sit there serving
+    // the starter list as though the real one had been thrown away. Nothing is
+    // pushed while this is unresolved, because the list in hand may be only seeds,
+    // so a mirror that never answers costs us nothing but leaves the stored copy whole.
+    restoreTry += 1;
+    console.error('restore attempt ' + restoreTry + ' failed (' + e.message + '); retrying in 30s');
+    setTimeout(restoreFromBackup, 30000);
   }
 }
 
