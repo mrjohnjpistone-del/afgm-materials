@@ -156,6 +156,7 @@
     border:1px solid var(--line); border-radius:9px; padding:7px 10px; cursor:pointer}
   .scenepick input{accent-color:var(--gold); width:15px; height:15px; flex:none; margin:0}
   .scenepick label:has(input:checked){border-color:var(--gold); color:var(--gold-ink)}
+  .scenepick.tight{grid-template-columns:repeat(auto-fill,minmax(124px,1fr))}
   .pill.st-buy,.pill.st-make{color:#a9bcf5; border-color:#34457a}
   .pill.st-none{color:var(--wine-ink); border-color:color-mix(in srgb,var(--wine) 45%,var(--line))}
   @media (max-width:680px){
@@ -427,10 +428,11 @@
           <span class="lab">Script pages</span>
           <input id="p_pages" maxlength="60" placeholder="e.g. 55-96">
         </label>
-        <label>
-          <span class="lab">Used by</span>
-          <input id="p_used" maxlength="120">
-        </label>
+        <div class="full">
+          <span class="lab">Used by — tick every character who handles this prop</span>
+          <div class="scenepick tight" id="p_chars"></div>
+          <input id="p_char_other" maxlength="240" placeholder="Anyone else not listed above (separate several with commas)">
+        </div>
         <label>
           <span class="lab">Preset</span>
           <input id="p_preset" maxlength="80" list="presets" placeholder="Prop table, onstage, personal…">
@@ -494,10 +496,14 @@ const KEYNAME = "afgm_materials_key";
 let KEY = localStorage.getItem(KEYNAME) || (new URLSearchParams(location.search).get("key") || "");
 let ITEMS = [], TRASH = [], CATS = [], STATUSES = [], AREAS = [], editingId = null, busy = false, poll = null;
 let PROPS = [], PTRASH = [], PSTAT = [], PLAB = {}, SCENES = [], PSCENES = [], pEditingId = null;
+let CHARS = [], PCHARS = [];
 // The wording comes from the server so the list and the spreadsheet always agree.
 const stLabel = (s) => (s ? (PLAB[s] || s.charAt(0).toUpperCase() + s.slice(1)) : "Not decided");
 const NO_SCENE = "No scene yet";
 const scenesOf = (m) => (Array.isArray(m.scenes) ? m.scenes : []);
+// A prop can be handled by several characters. Older rows kept one free-text string.
+const charsOf = (m) => (Array.isArray(m.used_by) ? m.used_by
+  : String(m.used_by || "").split(/[,;]/).map((x) => x.trim()).filter(Boolean));
 const firstPage = (p) => { const m = String(p || "").match(/\d+/); return m ? Number(m[0]) : 9999; };
 const UNASSIGNED = "Unassigned";
 
@@ -551,6 +557,8 @@ async function refresh(quiet) {
   PLAB = d.prop_status_labels || {};
   SCENES = d.scenes || [];
   PSCENES = d.prop_scenes || [];
+  CHARS = d.characters || [];
+  PCHARS = d.prop_characters || [];
   if (d.title) {
     document.title = "Manage · " + d.title;
     if (document.activeElement !== $("#s_title")) $("#s_title").value = d.title;
@@ -581,6 +589,16 @@ function fillSelects() {
     boxes.innerHTML = want.map((s) =>
       '<label><input type="checkbox" value="' + esc(s) + '">' + esc(s) + "</label>").join("");
     setPickedScenes(keep);
+  }
+  // Tick-boxes for the cast; a name somebody typed in once shows up alongside them.
+  const cboxes = $("#p_chars");
+  const cwant = PCHARS.concat(CHARS.filter((c) => !PCHARS.includes(c)));
+  if (cboxes.dataset.list !== cwant.join("|")) {
+    const keptc = pickedChars();
+    cboxes.dataset.list = cwant.join("|");
+    cboxes.innerHTML = cwant.map((c) =>
+      '<label><input type="checkbox" value="' + esc(c) + '">' + esc(c) + "</label>").join("");
+    setPickedChars(keptc);
   }
   const scf = $("#pSceneFilter");
   const scfWant = "*|" + want.join("|");
@@ -898,7 +916,7 @@ function visibleProps() {
     if (scf === "") { if (scenes.length) return false; }
     else if (scf && scf !== "*" && !scenes.some((s) => s.toLowerCase() === scf.toLowerCase())) return false;
     if (!q) return true;
-    return [m.item, scenes.join(" "), m.pages, m.used_by, m.preset, m.notes, m.added_by]
+    return [m.item, scenes.join(" "), m.pages, charsOf(m).join(" "), m.preset, m.notes, m.added_by]
       .filter(Boolean).join(" ").toLowerCase().includes(q);
   });
   const cmp = {
@@ -950,8 +968,31 @@ function setPickedScenes(list) {
   $("#p_scene_other").value = names.filter((n) => !known.includes(n.toLowerCase())).join(", ");
 }
 
+function charTags(m) {
+  const who = charsOf(m);
+  const tags = who.map((c) => '<span class="scn">' + esc(c) + "</span>").join("");
+  const pre = m.preset ? '<span class="p-sub">preset ' + esc(m.preset) + "</span>" : "";
+  return tags || pre ? tags + pre : '<span class="p-sub">—</span>';
+}
+
+const charBoxes = () => [...document.querySelectorAll("#p_chars input")];
+function pickedChars() {
+  const out = charBoxes().filter((b) => b.checked).map((b) => b.value);
+  for (const one of $("#p_char_other").value.split(",")) {
+    const t = one.trim();
+    if (t && !out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
+}
+function setPickedChars(list) {
+  const names = (list || []).map(String);
+  const lower = names.map((x) => x.toLowerCase());
+  for (const b of charBoxes()) b.checked = lower.includes(b.value.toLowerCase());
+  const known = charBoxes().map((b) => b.value.toLowerCase());
+  $("#p_char_other").value = names.filter((x) => !known.includes(x.toLowerCase())).join(", ");
+}
+
 function propRow(m) {
-  const used = [m.used_by, m.preset ? "preset " + m.preset : ""].filter(Boolean);
   const opts = ['<option value=""' + (m.source_status ? "" : " selected") + ">Not decided</option>"].concat(
     PSTAT.map((s) => '<option value="' + esc(s) + '"' + (s === m.source_status ? " selected" : "") + ">" +
       esc(stLabel(s)) + "</option>")).join("");
@@ -962,7 +1003,7 @@ function propRow(m) {
       (m.added_by ? '<span class="p-sub">added by ' + esc(m.added_by) + "</span>" : "") + "</td>" +
     '<td data-label="Qty"><span class="p-qty">' + esc(m.qty) + "</span></td>" +
     '<td data-label="Scenes">' + sceneTags(m) + "</td>" +
-    '<td data-label="Used by · preset">' + (used.length ? esc(used.join(" · ")) : '<span class="p-sub">—</span>') + "</td>" +
+    '<td data-label="Used by · preset">' + charTags(m) + "</td>" +
     '<td data-label="Source · status"><label class="sr" for="ps-' + esc(m.id) + '">Source and status for ' + esc(m.item) +
       '</label><select id="ps-' + esc(m.id) + '" data-pact="status">' + opts + "</select>" +
       borrowNote(m) + "</td>" +
@@ -1011,7 +1052,7 @@ function openPropForm(m) {
   $("#p_status").value = m ? (m.source_status || "") : "";
   setPickedScenes(m ? scenesOf(m) : []);
   $("#p_pages").value = m ? (m.pages || "") : "";
-  $("#p_used").value = m ? (m.used_by || "") : "";
+  setPickedChars(m ? charsOf(m) : []);
   $("#p_preset").value = m ? (m.preset || "") : "";
   $("#p_from").value = m ? (m.borrowed_from || "") : "";
   $("#p_return").value = m ? (m.return_to || "") : "";
@@ -1035,7 +1076,7 @@ $("#propForm").addEventListener("submit", async (e) => {
   if (!item) { show("err", "Please name the prop."); $("#p_item").focus(); return; }
   const body = {
     item, qty: $("#p_qty").value, scenes: pickedScenes(), pages: $("#p_pages").value,
-    used_by: $("#p_used").value, preset: $("#p_preset").value, source_status: $("#p_status").value,
+    used_by: pickedChars(), preset: $("#p_preset").value, source_status: $("#p_status").value,
     borrowed_from: $("#p_from").value, return_to: $("#p_return").value,
     notes: $("#p_notes").value, added_by: $("#p_by").value,
   };

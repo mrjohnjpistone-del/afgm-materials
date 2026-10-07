@@ -59,7 +59,7 @@ const PROP_STATUS_LABELS = {
 };
 // Common set pieces for this show — autocomplete suggestions only. Anyone can type a
 // new one, and the pick-list always includes whatever is actually in use.
-const AREA_HINTS = ['Jessup\'s desk', 'Judge\'s box', 'Balcony', 'Courtroom', 'Barracks',
+const AREA_HINTS = ['Jessep\'s desk', 'Judge\'s box', 'Balcony', 'Courtroom', 'Barracks',
   'Kaffee\'s office', 'Platform / deck', 'Stairs', 'Backdrop', 'General structure'];
 
 // The starting list. Only ever used for a store that has never existed.
@@ -94,6 +94,21 @@ const PROP_SCENES = [
   'Platform', "Whitaker's office", "Jessep's office", 'Softball', 'Brig', "Kaffee's office",
   "Sam's apartment", 'Code Red struggle', 'Cell', 'Courtroom', 'Orderly room', "Kaffee's apartment",
 ];
+// The cast, in the order the costume breakdown lists them: Marines first, then the
+// Navy lawyers. A prop is often handled by several of them, so "used by" is a list.
+const CHARACTERS = [
+  'Dawson', 'Downey', 'Santiago', 'Tom', 'Howard', 'Dunn', 'Hammaker', 'Thomas',
+  'Jessep', 'Kendrick', 'Markinson', 'Ross', 'Marine sentry', 'MP', 'Sergeant-at-arms',
+  'Judge Randolph', 'Door guard', 'Marine jury',
+  'Kaffee', 'Weinberg', 'Galloway', 'Whitaker', 'Dave', 'Lyle', 'Dr. Stone',
+  'Naval orderly', 'Navy jury',
+];
+// Short names people actually say (and the two spellings of the colonel) land on the
+// one character, so a prop isn't filed under "Randolph" and "Judge Randolph" both.
+const CHAR_ALIASES = {
+  jessup: 'Jessep', jessop: 'Jessep', randolph: 'Judge Randolph', judge: 'Judge Randolph',
+  stone: 'Dr. Stone', orderly: 'Naval orderly', sentry: 'Marine sentry',
+};
 // A starter list was auto-loaded once (all stamped with this time, nobody's name on
 // them). It was removed on request; this keeps it gone even if an old backup comes back.
 const OLD_SEED_AT = '2026-09-22T14:44:38.475Z';
@@ -104,14 +119,14 @@ function freshStore() {
     settings: {
       title: 'A Few Good Men — Set Build Materials',
       subtitle: 'Rialto Community Art Center',
-      notes: 'Add anything the build needs. Say what it\'s for (Jessup\'s desk, the judge\'s box, the balcony…) so the list can be sorted by set piece on build day.',
+      notes: 'Add anything the build needs. Say what it\'s for (Jessep\'s desk, the judge\'s box, the balcony…) so the list can be sorted by set piece on build day.',
       staff_key: DEFAULT_KEY,
     },
     // { id, name, qty, unit, area, category, notes, link, est_cost, status,
     //   added_by, created_at, updated_at }
     items: seedItems(),
     trash: [], // last 25 removals, so an accidental tap is recoverable
-    // { id, item, qty, scenes: [], pages, used_by, preset, source_status,
+    // { id, item, qty, scenes: [], pages, used_by: [], preset, source_status,
     //   borrowed_from, return_to, notes, added_by, created_at, updated_at }
     props: [],
     props_trash: [],
@@ -125,6 +140,8 @@ function upgradeProp(m) {
   const out = Object.assign({}, m);
   if (!Array.isArray(out.scenes)) out.scenes = cleanScenes(out.scene || '');
   delete out.scene;
+  // "Used by" was one free-text box; the names in it become separate picks.
+  if (!Array.isArray(out.used_by)) out.used_by = cleanCharacters(out.used_by || '');
   if (out.source_status && !PROP_STATUSES.includes(out.source_status)) out.source_status = '';
   // There is only one prop table in this build, so old SL/SR presets collapse onto it.
   if (/^\s*(SL|SR)\s+prop\s+table\s*$/i.test(out.preset || '')) out.preset = 'Prop table';
@@ -340,6 +357,28 @@ function cleanScenes(v) {
   });
 }
 
+// Characters arrive the same way as scenes, and are snapped to the cast spelling so
+// "kaffee" and "Kaffee" are one person. Anyone not in the cast list is kept as typed.
+function cleanCharacters(v) {
+  const raw = Array.isArray(v) ? v : String(v == null ? '' : v).split(/[,;]/);
+  const out = [];
+  for (const one of raw) {
+    let name = s(one, 80);
+    if (!name) continue;
+    const alias = CHAR_ALIASES[name.toLowerCase()];
+    if (alias) name = alias;
+    const known = CHARACTERS.find((x) => x.toLowerCase() === name.toLowerCase());
+    if (known) name = known;
+    if (!out.some((x) => x.toLowerCase() === name.toLowerCase())) out.push(name);
+    if (out.length >= 30) break;
+  }
+  // Cast order first; anything else after, as typed.
+  return out.sort((a, b) => {
+    const ia = CHARACTERS.indexOf(a), ib = CHARACTERS.indexOf(b);
+    return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib);
+  });
+}
+
 // Props fields, same never-trust approach. qty is free text on purpose: the prop
 // list really does say "1-2", "set", "2+" and "TBD".
 function readProp(b, base) {
@@ -354,7 +393,8 @@ function readProp(b, base) {
     ? cleanScenes(has('scenes') ? b.scenes : b.scene)
     : (cur.scenes || []);
   out.pages = has('pages') ? s(b.pages, 60) : (cur.pages || '');
-  out.used_by = has('used_by') ? s(b.used_by, 120) : (cur.used_by || '');
+  out.used_by = has('used_by') ? cleanCharacters(b.used_by)
+    : (Array.isArray(cur.used_by) ? cur.used_by : cleanCharacters(cur.used_by || ''));
   out.preset = has('preset') ? s(b.preset, 80) : (cur.preset || '');
   if (has('source_status')) {
     const st = s(b.source_status, 20).toLowerCase();
@@ -381,9 +421,12 @@ function csvCell(v) {
 function picks() {
   const scenes = new Set(PROP_SCENES);
   for (const m of store.props) for (const sc of m.scenes || []) scenes.add(sc);
+  const chars = new Set(CHARACTERS);
+  for (const m of store.props) for (const c of m.used_by || []) chars.add(c);
   return { categories: CATEGORIES, statuses: STATUSES, areas: areaList(), unassigned: UNASSIGNED,
     prop_statuses: PROP_STATUSES, prop_status_labels: PROP_STATUS_LABELS,
-    prop_scenes: PROP_SCENES, scenes: [...scenes] };
+    prop_scenes: PROP_SCENES, scenes: [...scenes],
+    prop_characters: CHARACTERS, characters: [...chars] };
 }
 
 // ── Static page serving ──────────────────────────────────────────────────────
@@ -452,7 +495,8 @@ const server = http.createServer(async (req, res) => {
         'Borrowed from', 'Return to', 'Notes', 'Added by', 'Added'];
       const lines = [cols.join(',')];
       for (const m of store.props) {
-        lines.push([m.item, m.qty, (m.scenes || []).join('; '), m.pages, m.used_by, m.preset,
+        lines.push([m.item, m.qty, (m.scenes || []).join('; '), m.pages,
+          (m.used_by || []).join('; '), m.preset,
           PROP_STATUS_LABELS[m.source_status] || 'Not decided', m.borrowed_from, m.return_to,
           m.notes, m.added_by, (m.created_at || '').slice(0, 10)].map(csvCell).join(','));
       }
@@ -516,7 +560,7 @@ const server = http.createServer(async (req, res) => {
         const id = s((await readBody(req)).id, 60);
         const i = store.props_trash.findIndex((m) => m.id === id);
         if (i === -1) return sendJson(res, 404, { error: 'Nothing left to undo for that prop.' });
-        const [back] = store.props_trash.splice(i, 1);
+        const back = upgradeProp(store.props_trash.splice(i, 1)[0]);
         back.updated_at = new Date().toISOString();
         store.props.push(back);
         save();
