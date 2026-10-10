@@ -252,8 +252,9 @@
           </datalist>
         </label>
         <label>
-          <span class="lab">What it's for</span>
-          <input id="f_area" maxlength="80" list="areas" placeholder="Jessup's desk, Judge's box, balcony…">
+          <span class="lab">What it's for <span class="req">*</span></span>
+          <input id="f_area" maxlength="80" list="areas" required
+                 placeholder="3-sided walls, backdrop, judge's box…">
           <datalist id="areas"></datalist>
         </label>
         <label>
@@ -273,8 +274,8 @@
           <textarea id="f_notes" maxlength="800"></textarea>
         </label>
         <label class="full">
-          <span class="lab">Your name (so we know who to ask about it)</span>
-          <input id="f_by" maxlength="80" placeholder="Optional">
+          <span class="lab">Your name <span class="req">*</span> (so we know who to ask about it)</span>
+          <input id="f_by" maxlength="80" required placeholder="First name is fine">
         </label>
       </div>
       <div style="display:flex; gap:10px; margin-top:16px">
@@ -287,8 +288,8 @@
   <div id="list"><div class="card"><div class="empty">Loading the list…</div></div></div>
 
   <div class="foot">
+    <a class="btn btn-primary" href="/print/shopping">🛒 Shopping list for the store</a>
     <a class="btn btn-ghost" href="/api/list.csv">⬇ Download as spreadsheet</a>
-    <button class="btn btn-ghost" type="button" onclick="window.print()">🖨 Print</button>
   </div>
   </section>
 
@@ -391,8 +392,8 @@
   <div id="plist"><div class="card"><div class="empty">Loading the props…</div></div></div>
 
   <div class="foot">
+    <a class="btn btn-primary" href="/print/props">🎭 Prop list for the show</a>
     <a class="btn btn-ghost" href="/api/props.csv">⬇ Download props as spreadsheet</a>
-    <button class="btn btn-ghost" type="button" onclick="window.print()">🖨 Print</button>
   </div>
   </section>
 
@@ -648,14 +649,27 @@ $("#itemForm").addEventListener("submit", async (e) => {
   if (busy) return;
   const name = $("#f_name").value.trim();
   if (!name) { show("err", "Please name the item."); $("#f_name").focus(); return; }
+  // What it is for, and who added it, are both required. The point of the first is
+  // that four sheets of luan is a different purchase depending on whether it is the
+  // 3-sided walls or the backdrop; the point of the second is being able to ask.
+  const area = $("#f_area").value.trim();
+  if (!area) {
+    show("err", "Please say what it's for — the 3-sided walls, the backdrop, the judge's box. "
+      + "Pick one from the list or type your own.");
+    $("#f_area").focus(); return;
+  }
   const by = $("#f_by").value.trim();
-  if (by) localStorage.setItem("afgm_who", by); else localStorage.removeItem("afgm_who");
+  if (!by) {
+    show("err", "Please put your name in so we know who to ask about it.");
+    $("#f_by").focus(); return;
+  }
+  localStorage.setItem("afgm_who", by);
 
   const body = {
     name,
     qty: $("#f_qty").value === "" ? 1 : $("#f_qty").value,
     unit: $("#f_unit").value,
-    area: $("#f_area").value,
+    area,
     category: $("#f_category").value,
     est_cost: $("#f_cost").value,
     link: $("#f_link").value.trim(),

@@ -21,6 +21,8 @@
 //                 POST   /api/staff/settings   edit the list's title / notes
 //                 POST   /api/staff/key        rotate the access key
 //
+//   PRINT         GET  /print/shopping         the shopping list for the store run
+//                 GET  /print/props            the prop list the show runs on
 //   PROPS         GET    /api/props.csv        props list as a spreadsheet (no key)
 //                 POST   /api/props            add a prop (no key, rate limited)
 //                 PATCH  /api/staff/props/:id  edit a prop
@@ -32,6 +34,7 @@ const http   = require('http');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
+const printable = require('./print');
 
 const PORT        = process.env.PORT || 3000;
 const DATA_DIR    = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -57,10 +60,16 @@ const PROP_STATUS_LABELS = {
   have: 'Have', borrow: 'Need to borrow', buy: 'Need to buy',
   make: 'Need to make', 'show-ready': 'Show ready',
 };
-// Common set pieces for this show — autocomplete suggestions only. Anyone can type a
-// new one, and the pick-list always includes whatever is actually in use.
-const AREA_HINTS = ['Jessep\'s desk', 'Judge\'s box', 'Balcony', 'Courtroom', 'Barracks',
-  'Kaffee\'s office', 'Platform / deck', 'Stairs', 'Backdrop', 'General structure'];
+// Common set pieces for this show. Saying what a thing is for is required — four
+// sheets of luan is a different purchase depending on whether it is the 3-sided
+// walls or the backdrop — but the wording is not: anyone can type a set piece
+// that is not on this list, and the pick-list always includes whatever is in use.
+const AREA_HINTS = ['3-sided walls', 'Backdrop', 'Balcony', 'Barracks', 'Courtroom',
+  // "Jessop's" is spelled the way the list already spells it, not the way the
+  // script spells the colonel. Two near-identical options is how lumber ends up
+  // booked against two different set pieces.
+  'General structure', 'Jessop\'s desk', 'Judge\'s box', 'Kaffee\'s office',
+  'Platform / deck', 'Stairs'];
 
 // The starting list. Only ever used for a store that has never existed.
 function seedItems() {
@@ -261,6 +270,14 @@ function sendJson(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(body);
 }
+function sendHtml(res, html) {
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Robots-Tag': 'noindex, nofollow',
+  });
+  res.end(html);
+}
 function readBody(req) {
   return new Promise((resolve, reject) => {
     // Collected as buffers, not strings: an accented character or an em dash can be
@@ -302,7 +319,9 @@ function readItem(b, base) {
   const out = {};
   out.name = has('name') ? s(b.name, 160) : cur.name;
   out.unit = has('unit') ? s(b.unit, 40) : (cur.unit || '');
-  out.area = has('area') ? (s(b.area, 80) || UNASSIGNED) : (cur.area || UNASSIGNED);
+  // Left blank rather than defaulted. "Unassigned" lumber is a question nobody
+  // can answer at the till, so the callers below refuse a blank instead.
+  out.area = has('area') ? s(b.area, 80) : (cur.area || '');
   out.notes = has('notes') ? (s(b.notes, 800) || null) : (cur.notes || null);
   out.added_by = has('added_by') ? (s(b.added_by, 80) || null) : (cur.added_by || null);
 
@@ -409,10 +428,16 @@ function readProp(b, base) {
 }
 
 // Areas offered as autocomplete: the suggestions plus every area actually in use.
+// Set pieces already in use come first, then the suggestions. Matching is done
+// case-insensitively so the list cannot offer both "Judge's box" and "Judge's Box"
+// and end up with the same piece recorded two ways; whatever is already on the
+// list wins, because that is the spelling the build lead has been using.
 function areaList() {
-  const seen = new Set(AREA_HINTS);
-  for (const m of store.items) if (m.area && m.area !== UNASSIGNED) seen.add(m.area);
-  return [...seen].sort((a, b) => a.localeCompare(b));
+  const seen = new Map();
+  const add = (v) => { const k = v.trim().toLowerCase(); if (k && !seen.has(k)) seen.set(k, v.trim()); };
+  for (const m of store.items) if (m.area && m.area !== UNASSIGNED) add(m.area);
+  for (const a of AREA_HINTS) add(a);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 function csvCell(v) {
   const t = v == null ? '' : String(v);
@@ -460,6 +485,21 @@ const server = http.createServer(async (req, res) => {
       return sendFile(res, 'staff.html', 'text/html; charset=utf-8');
     }
     if (method === 'GET' && p === '/poster.css') return sendFile(res, 'poster.css', 'text/css; charset=utf-8');
+
+    // ── PRINTABLE DOCUMENTS ─────────────────────────────────────────────────
+    // Rendered here rather than in the browser so that hitting Print can never
+    // race a fetch and hand someone a blank sheet in the lumber aisle.
+    if (method === 'GET' && (p === '/print/shopping' || p === '/shopping')) {
+      const vocab = { CATEGORIES, UNASSIGNED };
+      return sendHtml(res, printable.shoppingHtml(store, vocab,
+        Object.fromEntries(url.searchParams)));
+    }
+    if (method === 'GET' && (p === '/print/props' || p === '/proplist')) {
+      const vocab = { PROP_SCENES, PROP_STATUS_LABELS };
+      return sendHtml(res, printable.propsHtml(store, vocab,
+        Object.fromEntries(url.searchParams)));
+    }
+
     if (method === 'GET' && p === '/health')
       return sendJson(res, 200, { ok: true, items: store.items.length, props: store.props.length });
 
@@ -531,6 +571,13 @@ const server = http.createServer(async (req, res) => {
       const f = readItem(b, null);
       f.status = 'Needed'; // public adds always land as "Needed" — status is the build lead's call
       if (!f.name) return sendJson(res, 400, { error: 'Please name the item.' });
+      // Both of these are required, and the reasons are practical: a line nobody
+      // can attribute cannot be queried on build day, and lumber with no set piece
+      // against it cannot be checked at the store.
+      if (!f.area)
+        return sendJson(res, 400, { error: 'Please say what it is for — the 3-sided walls, the backdrop, the judge’s box. Pick one or type your own.' });
+      if (!f.added_by)
+        return sendJson(res, 400, { error: 'Please put your name in "Added by" so we know who to ask about it.' });
       const now = new Date().toISOString();
       const item = Object.assign({ id: uuid() }, f, { created_at: now, updated_at: now });
       store.items.push(item);
@@ -605,6 +652,12 @@ const server = http.createServer(async (req, res) => {
         if (!item) return sendJson(res, 404, { error: 'That item is no longer on the list.' });
         const f = readItem(await readBody(req), item);
         if (!f.name) return sendJson(res, 400, { error: 'Please name the item.' });
+        // An existing row may predate these being required, so an edit is allowed
+        // to leave one as it found it - it just cannot empty one that has a value.
+        if (!f.area && item.area)
+          return sendJson(res, 400, { error: 'An item has to say what it is for.' });
+        if (!f.added_by && item.added_by)
+          return sendJson(res, 400, { error: 'An item has to say who added it.' });
         Object.assign(item, f, { updated_at: new Date().toISOString() });
         save();
         return sendJson(res, 200, { ok: true, item });

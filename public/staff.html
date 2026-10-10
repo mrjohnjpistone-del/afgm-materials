@@ -276,7 +276,9 @@
           <div class="full" style="display:flex; gap:10px; flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" id="copyLink" type="button">Copy public link</button>
             <a class="btn btn-ghost btn-sm" id="csvLink" href="/api/list.csv">Download spreadsheet</a>
-            <button class="btn btn-ghost btn-sm" type="button" onclick="window.print()">Print the list</button>
+            <a class="btn btn-ghost btn-sm" href="/print/shopping">Shopping list for the store</a>
+            <a class="btn btn-ghost btn-sm" href="/print/shopping?group=area">Shopping list by set piece</a>
+            <a class="btn btn-ghost btn-sm" href="/print/shopping?all=1">Print every line</a>
           </div>
           <label class="full">
             <span class="lab">List title</span>
@@ -323,8 +325,8 @@
           </datalist>
         </label>
         <label>
-          <span class="lab">What it's for</span>
-          <input id="f_area" maxlength="80" list="areas" placeholder="Jessup's desk, Judge's box, balcony…">
+          <span class="lab">What it's for <span class="req">*</span></span>
+          <input id="f_area" maxlength="80" list="areas" placeholder="3-sided walls, backdrop, judge's box…">
           <datalist id="areas"></datalist>
         </label>
         <label>
@@ -348,8 +350,8 @@
           <textarea id="f_notes" maxlength="800"></textarea>
         </label>
         <label class="full">
-          <span class="lab">Added by</span>
-          <input id="f_by" maxlength="80" placeholder="Optional">
+          <span class="lab">Added by <span class="req">*</span></span>
+          <input id="f_by" maxlength="80" placeholder="First name is fine">
         </label>
       </div>
       <div style="display:flex; gap:10px; margin-top:16px">
@@ -400,7 +402,7 @@
     <div class="summary" id="pSummary"></div>
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
       <a class="btn btn-ghost btn-sm" href="/api/props.csv">Download props spreadsheet</a>
-      <button class="btn btn-ghost btn-sm" type="button" onclick="window.print()">Print the props list</button>
+      <a class="btn btn-ghost btn-sm" href="/print/props">Prop list for the show</a>
     </div>
   </div>
 
@@ -768,17 +770,36 @@ $("#itemForm").addEventListener("submit", async (e) => {
   if (busy) return;
   const name = $("#f_name").value.trim();
   if (!name) { show("err", "Please name the item."); $("#f_name").focus(); return; }
+  // Both of these are required on a new item: four sheets of luan is a different
+  // purchase depending on whether it is the 3-sided walls or the backdrop, and a
+  // line nobody can attribute cannot be asked about on build day. An EDIT is held
+  // to the softer rule the server uses — an old row that predates this may stay as
+  // it is, it just cannot have a value emptied out.
+  const area = $("#f_area").value.trim();
+  const by = $("#f_by").value.trim();
+  const was = editingId ? ITEMS.find((m) => m.id === editingId) : null;
+  const needArea = !editingId || !!(was && was.area && was.area !== UNASSIGNED);
+  const needBy = !editingId || !!(was && was.added_by);
+  if (!area && needArea) {
+    show("err", "Please say what it's for — the 3-sided walls, the backdrop, the judge's box. "
+      + "Pick one from the list or type your own.");
+    $("#f_area").focus(); return;
+  }
+  if (!by && needBy) {
+    show("err", "Please put a name in “Added by” so we know who to ask about it.");
+    $("#f_by").focus(); return;
+  }
   const body = {
     name,
     qty: $("#f_qty").value === "" ? 1 : $("#f_qty").value,
     unit: $("#f_unit").value,
-    area: $("#f_area").value,
+    area,
     category: $("#f_category").value,
     status: $("#f_status").value,
     est_cost: $("#f_cost").value,
     link: $("#f_link").value.trim(),
     notes: $("#f_notes").value,
-    added_by: $("#f_by").value,
+    added_by: by,
   };
   busy = true;
   $("#saveBtn").disabled = true;
