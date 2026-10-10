@@ -103,6 +103,15 @@ const PROP_SCENES = [
   'Platform', "Whitaker's office", "Jessep's office", 'Softball', 'Brig', "Kaffee's office",
   "Sam's apartment", 'Code Red struggle', 'Cell', 'Courtroom', 'Orderly room', "Kaffee's apartment",
 ];
+// Which act each scene sits in. Used only by the printed prop list — the props page
+// itself is not split by act. The break falls between the cell and the court-martial,
+// which is where the script pages already on the list put it: the flask in the cell is
+// pp. 54-55, the courtroom handcuffs run 62-109.
+const PROP_ACTS = {
+  'Platform': 1, "Whitaker's office": 1, "Jessep's office": 1, 'Softball': 1, 'Brig': 1,
+  "Kaffee's office": 1, "Sam's apartment": 1, 'Code Red struggle': 1, 'Cell': 1,
+  'Courtroom': 2, 'Orderly room': 2, "Kaffee's apartment": 2,
+};
 // The cast, in the order the costume breakdown lists them: Marines first, then the
 // Navy lawyers. A prop is often handled by several of them, so "used by" is a list.
 const CHARACTERS = [
@@ -495,7 +504,7 @@ const server = http.createServer(async (req, res) => {
         Object.fromEntries(url.searchParams)));
     }
     if (method === 'GET' && (p === '/print/props' || p === '/proplist')) {
-      const vocab = { PROP_SCENES, PROP_STATUS_LABELS };
+      const vocab = { PROP_SCENES, PROP_STATUS_LABELS, PROP_ACTS };
       return sendHtml(res, printable.propsHtml(store, vocab,
         Object.fromEntries(url.searchParams)));
     }

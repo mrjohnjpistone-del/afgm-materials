@@ -325,136 +325,127 @@ function shoppingHtml(store, vocab, q) {
 // list in the weeks before, and alphabetically when someone asks "do we have
 // a flask?". A prop in three scenes appears three times in the running order -
 // that is the point of a running order.
+// The stage manager's prop list. One line per prop, split into the two acts, with
+// who handles it, which scenes it is in and the script pages. Deliberately no
+// sourcing status: this is the copy that lives on the prop table and in the booth,
+// where the only question is what the prop is, how many, and when it is needed.
 function propsHtml(store, vocab, q) {
   const props = store.props.slice();
-  const label = (s) => vocab.PROP_STATUS_LABELS[s] || 'Not decided';
-  const settled = (m) => m.source_status === 'have' || m.source_status === 'show-ready';
-
-  const scenes = bucket(props, (m) => (m.scenes || []).filter(has),
-    vocab.PROP_SCENES, 'No scene listed');
-  const presets = bucket(props.filter((m) => has(m.preset)),
-    (m) => [m.preset.trim()], [], 'Prop table');
-  const chase = props.filter((m) => !settled(m));
+  const ACTS = vocab.PROP_ACTS || {};
+  const order = vocab.PROP_SCENES || [];
+  const pos = (s) => {
+    const i = order.indexOf(s);
+    return i === -1 ? 999 : i;
+  };
+  const sceneAct = (s) => ACTS[s] || ACTS[(order.find((k) => k.toLowerCase() === String(s).toLowerCase()) || '')] || 0;
 
   const who = (m) => (m.used_by || []).filter(has).join(', ') || '—';
+  // Scenes of this prop that belong to the given act, printed in running order.
+  const actScenes = (m, act) => (m.scenes || []).filter(has)
+    .filter((s) => sceneAct(s) === act)
+    .sort((a, b) => pos(a) - pos(b));
+  // Anything typed into a scene field that is not a scene — a character name, a
+  // guess — is kept and shown at the end rather than quietly dropped.
+  const strayScenes = (m) => (m.scenes || []).filter(has).filter((s) => !sceneAct(s));
+
+  const inAct = (act) => props
+    .filter((m) => actScenes(m, act).length)
+    .sort((a, b) => {
+      const d = pos(actScenes(a, act)[0]) - pos(actScenes(b, act)[0]);
+      return d || byName('item')(a, b);
+    });
+
+  const rows = (list, act) => {
+    let out = '<table><thead><tr>'
+      + '<th>Prop</th>'
+      + '<th class="c" style="width:58px">How<br>many</th>'
+      + '<th style="width:1.9in">Used by</th>'
+      + '<th style="width:1.6in">Scene</th>'
+      + '<th style="width:76px">Pages</th>'
+      + '</tr></thead><tbody>\n';
+    for (const m of list) {
+      out += '<tr>'
+        + '<td><span class="item">' + esc(m.item) + '</span>'
+        + (has(m.notes) ? '<span class="note">' + escLines(m.notes) + '</span>' : '')
+        + '</td>'
+        + '<td class="c qty">' + esc(m.qty || 1) + '</td>'
+        + '<td>' + esc(who(m)) + '</td>'
+        + '<td>' + esc(actScenes(m, act).join(', ')) + '</td>'
+        + '<td class="c">' + (has(m.pages) ? esc(m.pages) : WRITE) + '</td>'
+        + '</tr>\n';
+    }
+    return out + '</tbody></table>\n';
+  };
+
+  const one = inAct(1);
+  const two = inAct(2);
+  const stray = props.filter((m) => strayScenes(m).length);
+  const unplaced = props.filter((m) => !(m.scenes || []).filter(has).length);
+  const borrowed = props.filter((m) => has(m.borrowed_from) || has(m.return_to));
 
   let body = '';
 
-  // 1. Running order.
-  body += '<h2>Running order <span class="n">· by scene</span></h2>\n';
-  if (!scenes.length) {
-    body += '<p class="lead">No props on the list yet.</p>\n';
-  }
-  for (const [scene, list] of scenes) {
-    list.sort(byName('item'));
-    body += '<h3>' + esc(scene) + ' <span class="n">· ' + list.length
-      + (list.length === 1 ? ' prop' : ' props') + '</span></h3>\n';
+  body += '<h2>Act One <span class="n">· ' + one.length
+    + (one.length === 1 ? ' prop' : ' props') + '</span></h2>\n';
+  body += one.length ? rows(one, 1)
+    : '<p class="lead">No props listed in an Act One scene yet.</p>\n';
+
+  body += '<h2>Act Two <span class="n">· ' + two.length
+    + (two.length === 1 ? ' prop' : ' props') + '</span></h2>\n';
+  body += two.length ? rows(two, 2)
+    : '<p class="lead">No props listed in an Act Two scene yet.</p>\n';
+
+  // Everything the two act tables could not place, so a prop is never lost between them.
+  if (stray.length || unplaced.length) {
+    body += '<h2>Still to place <span class="n">· no act yet</span></h2>\n';
     body += '<table><thead><tr>'
-      + '<th class="c" style="width:28px">Set</th>'
-      + '<th style="width:48px">Qty</th>'
-      + '<th>Prop</th>'
-      + '<th style="width:1.6in">Used by</th>'
-      + '<th style="width:62px">Page</th>'
+      + '<th>Prop</th><th class="c" style="width:58px">How<br>many</th>'
+      + '<th style="width:1.75in">Used by</th>'
+      + '<th style="width:2.1in">What the scene says</th>'
       + '</tr></thead><tbody>\n';
-    for (const m of list) {
-      const bits = [];
-      if (has(m.preset)) bits.push('Preset: ' + esc(m.preset));
-      if (has(m.notes)) bits.push(escLines(m.notes));
-      if (!settled(m)) bits.push('<span class="flag open">' + esc(label(m.source_status)) + '</span>');
-      body += '<tr>'
-        + '<td class="c">' + BOX + '</td>'
-        + '<td class="qty">' + esc(m.qty || 1) + '</td>'
-        + '<td><span class="item">' + esc(m.item) + '</span>'
-        + (bits.length ? '<span class="note">' + bits.join(' &nbsp;·&nbsp; ') + '</span>' : '')
-        + '</td>'
+    for (const m of [...stray, ...unplaced].sort(byName('item'))) {
+      const said = strayScenes(m).join(', ');
+      body += '<tr><td><span class="item">' + esc(m.item) + '</span></td>'
+        + '<td class="c qty">' + esc(m.qty || 1) + '</td>'
         + '<td>' + esc(who(m)) + '</td>'
-        + '<td>' + (has(m.pages) ? esc(m.pages) : '—') + '</td>'
-        + '</tr>\n';
+        + '<td>' + (said ? esc(said) : '<span class="flag open">No scene listed</span>')
+        + '</td></tr>\n';
     }
     body += '</tbody></table>\n';
+    body += '<p class="lead">Give each of these a scene on the props page and it moves '
+      + 'into the act it belongs to.</p>\n';
   }
 
-  // 2. Preset. Only what someone has actually said belongs somewhere.
-  body += '<h2>Preset <span class="n">· before the house opens</span></h2>\n';
-  if (!presets.length) {
-    body += '<p class="lead">No preset positions recorded yet. Add a preset to a prop on the '
-      + 'props page — "Prop table", "Onstage, Jessep’s desk" — and it will be listed here.</p>\n';
-  }
-  for (const [place, list] of presets) {
-    list.sort(byName('item'));
-    body += '<h3>' + esc(place) + ' <span class="n">· ' + list.length
-      + (list.length === 1 ? ' prop' : ' props') + '</span></h3>\n';
-    body += '<table><thead><tr><th class="c" style="width:28px">Set</th>'
-      + '<th style="width:48px">Qty</th><th>Prop</th>'
-      + '<th style="width:1.6in">Used by</th></tr></thead><tbody>\n';
-    for (const m of list) {
-      body += '<tr><td class="c">' + BOX + '</td><td class="qty">' + esc(m.qty || 1) + '</td>'
-        + '<td><span class="item">' + esc(m.item) + '</span></td>'
-        + '<td>' + esc(who(m)) + '</td></tr>\n';
-    }
-    body += '</tbody></table>\n';
-  }
-
-  // 3. The chase list. Borrowed things have to go home again, so the lender and
-  // the return plan travel with the row.
-  body += '<h2>Still to source <span class="n">· ' + chase.length + ' of ' + props.length
-    + '</span></h2>\n';
-  if (!chase.length) {
-    body += '<p class="lead">Every prop on the list is in hand.</p>\n';
-  } else {
-    body += '<table><thead><tr><th class="c" style="width:28px">Done</th>'
-      + '<th style="width:48px">Qty</th><th>Prop</th>'
-      + '<th style="width:1.45in">What it needs</th>'
-      + '<th style="width:1.7in">From / back to</th></tr></thead><tbody>\n';
-    for (const m of chase.slice().sort(byName('item'))) {
-      const where = [];
-      if (has(m.borrowed_from)) where.push('From ' + esc(m.borrowed_from));
-      if (has(m.return_to)) where.push('Back to ' + esc(m.return_to));
-      const sc = (m.scenes || []).filter(has).join(', ');
-      body += '<tr><td class="c">' + BOX + '</td><td class="qty">' + esc(m.qty || 1) + '</td>'
-        + '<td><span class="item">' + esc(m.item) + '</span>'
-        + (sc ? '<span class="note">' + esc(sc) + '</span>' : '')
-        + (has(m.notes) ? '<span class="note">' + escLines(m.notes) + '</span>' : '')
-        + '</td>'
-        + '<td><span class="flag ' + (m.source_status === 'buy' ? 'buy' : 'open') + '">'
-        + esc(label(m.source_status)) + '</span></td>'
-        + '<td>' + (where.length ? where.join('<br>') : '—') + '</td></tr>\n';
-    }
-    body += '</tbody></table>\n';
-  }
-
-  // 4. Every prop once, by name, so "do we have a flask?" has one place to look.
-  body += '<h2>Every prop <span class="n">· A to Z</span></h2>\n';
-  if (props.length) {
-    body += '<table><thead><tr><th style="width:48px">Qty</th><th>Prop</th>'
-      + '<th style="width:1.3in">Status</th><th style="width:2.1in">Scenes</th>'
+  // Borrowed things have to go home again. Prints only when something is borrowed.
+  if (borrowed.length) {
+    body += '<h2>Borrowed <span class="n">· where it came from, where it goes back</span></h2>\n';
+    body += '<table><thead><tr><th>Prop</th>'
+      + '<th style="width:2.3in">From</th><th style="width:2.3in">Return to</th>'
       + '</tr></thead><tbody>\n';
-    for (const m of props.slice().sort(byName('item'))) {
-      const sc = (m.scenes || []).filter(has).join(', ') || '—';
-      body += '<tr><td class="qty">' + esc(m.qty || 1) + '</td>'
+    for (const m of borrowed.slice().sort(byName('item'))) {
+      body += '<tr>'
         + '<td><span class="item">' + esc(m.item) + '</span></td>'
-        + '<td><span class="flag' + (settled(m) ? '' : ' open') + '">'
-        + esc(label(m.source_status)) + '</span></td>'
-        + '<td>' + esc(sc) + '</td></tr>\n';
+        + '<td>' + (has(m.borrowed_from) ? esc(m.borrowed_from) : WRITE) + '</td>'
+        + '<td>' + (has(m.return_to) ? esc(m.return_to) : WRITE) + '</td></tr>\n';
     }
     body += '</tbody></table>\n';
   }
 
-  const appearances = scenes.reduce((t, [, l]) => t + l.length, 0);
   const meta = '<span><b>' + props.length + '</b> '
     + (props.length === 1 ? 'prop' : 'props') + '</span>'
-    + '<span><b>' + appearances + '</b> scene cues</span>'
-    + '<span><b>' + chase.length + '</b> still to source</span>';
+    + '<span><b>' + one.length + '</b> in Act One</span>'
+    + '<span><b>' + two.length + '</b> in Act Two</span>';
 
   return shell({
     title: 'Prop list — A Few Good Men',
     barTitle: 'Prop list',
     heading: 'Prop List',
-    sub: 'Running order, preset, and what is still to find',
+    sub: 'Act One and Act Two · who handles it, which scene, which pages',
     meta,
     body,
     back: '/',
-    footLeft: 'Scenes run in the order printed. A prop used in three scenes is listed three times.',
+    footLeft: 'Within each act the props are in running order. A prop used in both acts '
+      + 'is listed in both. Pages left blank are for the book.',
     links: '',
   });
 }
