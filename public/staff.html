@@ -264,6 +264,12 @@
       </label>
     </div>
     <div class="summary" id="summary"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px">
+      <a class="btn btn-primary" href="/print/shopping">&#128722; Shopping list for the store</a>
+      <a class="btn btn-ghost" href="/api/list.csv">&#8681; Download as spreadsheet</a>
+      <a class="btn btn-ghost btn-sm" href="/print/shopping?group=area">By set piece</a>
+      <a class="btn btn-ghost btn-sm" href="/print/shopping?all=1">Print every line</a>
+    </div>
 
     <details class="tools">
       <summary>List settings, sharing &amp; access key</summary>
@@ -275,10 +281,6 @@
           </label>
           <div class="full" style="display:flex; gap:10px; flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" id="copyLink" type="button">Copy public link</button>
-            <a class="btn btn-ghost btn-sm" id="csvLink" href="/api/list.csv">Download spreadsheet</a>
-            <a class="btn btn-ghost btn-sm" href="/print/shopping">Shopping list for the store</a>
-            <a class="btn btn-ghost btn-sm" href="/print/shopping?group=area">Shopping list by set piece</a>
-            <a class="btn btn-ghost btn-sm" href="/print/shopping?all=1">Print every line</a>
           </div>
           <label class="full">
             <span class="lab">List title</span>
@@ -400,9 +402,9 @@
       </label>
     </div>
     <div class="summary" id="pSummary"></div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
-      <a class="btn btn-ghost btn-sm" href="/api/props.csv">Download props spreadsheet</a>
-      <a class="btn btn-ghost btn-sm" href="/print/props">Prop list for the show</a>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px">
+      <a class="btn btn-primary" href="/print/props">&#127917; Prop list for the show</a>
+      <a class="btn btn-ghost" href="/api/props.csv">&#8681; Download props as spreadsheet</a>
     </div>
   </div>
 
