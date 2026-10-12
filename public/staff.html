@@ -202,13 +202,13 @@
     <div id="gateMsg" hidden></div>
     <form id="gateForm">
       <label>
-        <span class="lab">Access key</span>
-        <input id="key" type="password" autocomplete="current-password" placeholder="Enter the key">
+        <span class="lab">Password</span>
+        <input id="key" type="password" autocomplete="current-password" placeholder="Enter the password">
       </label>
       <button class="btn btn-primary btn-wide" type="submit" style="margin-top:14px">Open the list</button>
     </form>
     <p class="foot-note" style="margin-top:16px">
-      Adding items doesn't need a key — anyone can do that on the
+      Adding items doesn't need a password — anyone can do that on the
       <a href="/">public list</a>. This page is for changing and removing them.
     </p>
   </div>
@@ -272,7 +272,7 @@
     </div>
 
     <details class="tools">
-      <summary>List settings, sharing &amp; access key</summary>
+      <summary>Settings, public link &amp; change the password</summary>
       <div class="body">
         <div class="form-grid">
           <label class="full">
@@ -294,11 +294,11 @@
             <button class="btn btn-ghost btn-sm" id="saveSettings" type="button">Save settings</button>
           </div>
           <label class="full">
-            <span class="lab">Change the access key (at least 6 characters)</span>
-            <input id="s_key" maxlength="80" placeholder="New key">
+            <span class="lab">Change the password (at least 6 characters)</span>
+            <input id="s_key" maxlength="80" placeholder="New password">
           </label>
           <div class="full">
-            <button class="btn btn-ghost btn-sm" id="saveKey" type="button">Change key</button>
+            <button class="btn btn-ghost btn-sm" id="saveKey" type="button">Change password</button>
             <button class="btn btn-ghost btn-sm" id="signOut" type="button">Sign out of this device</button>
           </div>
         </div>
@@ -545,7 +545,7 @@ async function api(method, path, body) {
     $("#gate").hidden = false;
     const g = $("#gateMsg");
     g.className = "msg err";
-    g.textContent = "That key wasn't accepted. Try again.";
+    g.textContent = "That password wasn't accepted. Try again.";
     g.hidden = false;
     throw new Error("unauthorized");
   }
@@ -922,14 +922,14 @@ $("#saveSettings").addEventListener("click", async () => {
 
 $("#saveKey").addEventListener("click", async () => {
   const nk = $("#s_key").value.trim();
-  if (nk.length < 6) { show("err", "Use at least 6 characters for the key."); return; }
-  if (!confirm("Change the access key? Anyone using the old key will have to be given the new one.")) return;
+  if (nk.length < 6) { show("err", "Use at least 6 characters for the password."); return; }
+  if (!confirm("Change the password? Anyone using the old one will have to be given the new password.")) return;
   try {
     await api("POST", "/api/staff/key", { key: nk });
     KEY = nk;
     localStorage.setItem(KEYNAME, nk);
     $("#s_key").value = "";
-    show("ok", "<span>Key changed. This device is still signed in.</span>");
+    show("ok", "<span>Password changed. This device is still signed in.</span>");
   } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
 });
 
