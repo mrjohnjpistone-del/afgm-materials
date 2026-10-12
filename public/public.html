@@ -422,6 +422,10 @@ const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) =>
 
 let ITEMS = [], CATS = [], AREAS = [], PROPS = [], PSTAT = [], PLAB = {}, SCENES = [], PSCENES = [];
 let CHARS = [], PCHARS = [], busy = false;
+// How many lines this person has typed in without leaving the form. Both add forms
+// stay open after a save so a whole run of lumber or a scene's worth of props can be
+// entered in one sitting; these just keep the count honest in the message.
+let addedItems = 0, addedProps = 0;
 const UNASSIGNED = "Unassigned";
 
 const money = (n) => "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -634,12 +638,18 @@ function openForm() {
   $("#f_link").value = "";
   $("#f_notes").value = "";
   $("#f_by").value = localStorage.getItem("afgm_who") || "";
+  addedItems = 0;
+  $("#cancelBtn").textContent = "Cancel";
   $("#formCard").hidden = false;
   clearMsg();
   $("#formCard").scrollIntoView({ block: "center", behavior: "smooth" });
   $("#f_name").focus();
 }
-function closeForm() { $("#formCard").hidden = true; }
+function closeForm() {
+  $("#formCard").hidden = true;
+  addedItems = 0;
+  $("#cancelBtn").textContent = "Cancel";
+}
 
 $("#addBtn").addEventListener("click", openForm);
 $("#cancelBtn").addEventListener("click", closeForm);
@@ -681,9 +691,22 @@ $("#itemForm").addEventListener("submit", async (e) => {
   $("#saveBtn").innerHTML = '<span class="spin"></span>Adding…';
   try {
     await api("POST", "/api/items", body);
-    closeForm();
+    // Stay open for the next line. Four sheets of luan, eight 2x4s and a box of
+    // screws are all for the same wall, added by the same person — so only the item
+    // itself is cleared, and "What it's for", the unit, the type of material and
+    // your name carry over. Done closes the form.
+    addedItems++;
+    $("#f_name").value = "";
+    $("#f_qty").value = 1;
+    $("#f_cost").value = "";
+    $("#f_link").value = "";
+    $("#f_notes").value = "";
+    $("#cancelBtn").textContent = "Done";
     await loadList();
-    show("ok", "Added <b>" + esc(name) + "</b> to the list. Thank you.");
+    show("ok", "Added <b>" + esc(name) + "</b>. That's <b>" + addedItems +
+      (addedItems === 1 ? "</b> item" : "</b> items") +
+      " so far — type the next one straight in, or press Done when you're finished.");
+    $("#f_name").focus();
   } catch (err) {
     show("err", esc(err.message));
   } finally {
@@ -829,19 +852,26 @@ function setPickedScenes(list) {
   $("#p_scene_other").value = names.filter((n) => !known.includes(n.toLowerCase())).join(", ");
 }
 
-function resetPropForm() {
-  for (const id of ["#p_item", "#p_pages", "#p_char_other", "#p_preset", "#p_notes", "#p_scene_other",
-    "#p_from", "#p_return"]) $(id).value = "";
-  for (const b of sceneBoxes()) b.checked = false;
-  for (const b of charBoxes()) b.checked = false;
+// keepContext leaves the scenes, the characters, the preset, the status and the
+// borrow details ticked and typed as they are, and clears only the prop itself. A
+// scene's worth of props — the folders, the glasses, the carafe on Jessup's desk —
+// then goes in one line after another without re-ticking anything.
+function resetPropForm(keepContext) {
+  for (const id of ["#p_item", "#p_pages", "#p_notes"]) $(id).value = "";
   $("#p_qty").value = "1";
-  $("#p_status").value = "";
+  if (!keepContext) {
+    for (const id of ["#p_char_other", "#p_preset", "#p_scene_other", "#p_from", "#p_return"])
+      $(id).value = "";
+    for (const b of sceneBoxes()) b.checked = false;
+    for (const b of charBoxes()) b.checked = false;
+    $("#p_status").value = "";
+  }
   $("#p_by").value = localStorage.getItem("afgm_who") || "";
   syncBorrow();
 }
 $("#p_status").addEventListener("change", syncBorrow);
 resetPropForm();
-$("#pCancelBtn").addEventListener("click", () => { resetPropForm(); clearMsg(); });
+$("#pCancelBtn").addEventListener("click", () => { addedProps = 0; resetPropForm(); clearMsg(); });
 
 $("#propForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -861,9 +891,14 @@ $("#propForm").addEventListener("submit", async (e) => {
   $("#pSaveBtn").innerHTML = '<span class="spin"></span>Adding…';
   try {
     await api("POST", "/api/props", body);
-    resetPropForm();
+    addedProps++;
+    resetPropForm(true);
     await loadList();
-    show("ok", "Added <b>" + esc(item) + "</b> to the props list. Thank you.");
+    show("ok", "Added <b>" + esc(item) + "</b>. That's <b>" + addedProps +
+      (addedProps === 1 ? "</b> prop" : "</b> props") +
+      " so far — the scenes, cast and status are still set, so just name the next prop. " +
+      "<b>Clear</b> empties the form.");
+    $("#p_item").focus();
   } catch (err) {
     show("err", esc(err.message));
   } finally {
@@ -893,10 +928,12 @@ setTab(location.hash === "#props" ? "props" : "materials");
 
 // Everyone is on the same list — refresh quietly, but never while someone is typing
 // into an add form (that would clobber what they are in the middle of writing).
+// Ticked scenes and characters are deliberately NOT a draft: they stay ticked
+// between props now, and treating them as one would stop the quiet refresh for the
+// rest of the sitting. fillSelects() already re-ticks them if the boxes get rebuilt.
 const propDraft = () => ["#p_item", "#p_scene_other", "#p_pages", "#p_char_other", "#p_preset",
   "#p_notes", "#p_from", "#p_return"]
-  .some((id) => $(id).value.trim())
-  || sceneBoxes().some((b) => b.checked) || charBoxes().some((b) => b.checked);
+  .some((id) => $(id).value.trim());
 const formOpen = () => !$("#formCard").hidden || propDraft() || document.activeElement && $("#propForm").contains(document.activeElement);
 setInterval(() => {
   if (formOpen() || busy || document.hidden) return;

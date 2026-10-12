@@ -502,6 +502,10 @@ let KEY = localStorage.getItem(KEYNAME) || (new URLSearchParams(location.search)
 let ITEMS = [], TRASH = [], CATS = [], STATUSES = [], AREAS = [], editingId = null, busy = false, poll = null;
 let PROPS = [], PTRASH = [], PSTAT = [], PLAB = {}, SCENES = [], PSCENES = [], pEditingId = null;
 let CHARS = [], PCHARS = [];
+// Both add forms stay open after a save so a whole run can be typed in one sitting.
+// These count what has gone in since the form was opened. Editing is unaffected —
+// an edit still closes the form, because there is nothing to type next.
+let addedItems = 0, addedProps = 0;
 // The wording comes from the server so the list and the spreadsheet always agree.
 const stLabel = (s) => (s ? (PLAB[s] || s.charAt(0).toUpperCase() + s.slice(1)) : "Not decided");
 const NO_SCENE = "No scene yet";
@@ -757,12 +761,19 @@ function openForm(m) {
   $("#f_link").value = m ? (m.link || "") : "";
   $("#f_notes").value = m ? (m.notes || "") : "";
   $("#f_by").value = (m && m.added_by) || "";
+  addedItems = 0;
+  $("#cancelBtn").textContent = "Cancel";
   $("#formCard").hidden = false;
   clearMsg();
   $("#formCard").scrollIntoView({ block: "center", behavior: "smooth" });
   $("#f_name").focus();
 }
-function closeForm() { $("#formCard").hidden = true; editingId = null; }
+function closeForm() {
+  $("#formCard").hidden = true;
+  editingId = null;
+  addedItems = 0;
+  $("#cancelBtn").textContent = "Cancel";
+}
 
 $("#addBtn").addEventListener("click", () => openForm(null));
 $("#cancelBtn").addEventListener("click", closeForm);
@@ -823,9 +834,27 @@ $("#itemForm").addEventListener("submit", async (e) => {
       if (body.status && body.status !== "Needed" && d.item)
         await api("PATCH", "/api/staff/items/" + encodeURIComponent(d.item.id), { status: body.status });
     }
-    closeForm();
-    clearMsg();
-    await refresh();
+    if (editingId) {
+      closeForm();
+      clearMsg();
+      await refresh();
+    } else {
+      // Stay open for the next line. Only the item itself is cleared; what it's for,
+      // the unit, the type, the status and your name carry over, because a run of
+      // lumber for one wall is one trip to the store, not eight separate decisions.
+      addedItems++;
+      $("#f_name").value = "";
+      $("#f_qty").value = 1;
+      $("#f_cost").value = "";
+      $("#f_link").value = "";
+      $("#f_notes").value = "";
+      $("#cancelBtn").textContent = "Done";
+      await refresh();
+      show("ok", "Added <b>" + esc(name) + "</b>. That's <b>" + addedItems +
+        (addedItems === 1 ? "</b> item" : "</b> items") +
+        " so far — type the next one straight in, or press Done when you're finished.");
+      $("#f_name").focus();
+    }
   } catch (err) {
     if (err.message !== "unauthorized") show("err", esc(err.message));
   } finally {
@@ -1083,12 +1112,19 @@ function openPropForm(m) {
   syncBorrow();
   $("#p_notes").value = m ? (m.notes || "") : "";
   $("#p_by").value = (m && m.added_by) || "";
+  addedProps = 0;
+  $("#pCancelBtn").textContent = "Cancel";
   $("#pFormCard").hidden = false;
   clearMsg();
   $("#pFormCard").scrollIntoView({ block: "center", behavior: "smooth" });
   $("#p_item").focus();
 }
-function closePropForm() { $("#pFormCard").hidden = true; pEditingId = null; }
+function closePropForm() {
+  $("#pFormCard").hidden = true;
+  pEditingId = null;
+  addedProps = 0;
+  $("#pCancelBtn").textContent = "Cancel";
+}
 $("#p_status").addEventListener("change", syncBorrow);
 $("#pAddBtn").addEventListener("click", () => openPropForm(null));
 $("#pCancelBtn").addEventListener("click", closePropForm);
@@ -1118,9 +1154,28 @@ $("#propForm").addEventListener("submit", async (e) => {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Something went wrong. Please try again.");
     }
-    closePropForm();
-    clearMsg();
-    await refresh();
+    if (pEditingId) {
+      closePropForm();
+      clearMsg();
+      await refresh();
+    } else {
+      // Stay open for the next prop. The scenes, the cast, the status, the preset and
+      // the borrow details stay as they are, because a scene's worth of props — the
+      // folders, the glasses, the carafe on Jessup's desk — belongs to the same scene
+      // and the same person. Only the prop itself is cleared.
+      addedProps++;
+      $("#p_item").value = "";
+      $("#p_qty").value = "1";
+      $("#p_pages").value = "";
+      $("#p_notes").value = "";
+      $("#pCancelBtn").textContent = "Done";
+      await refresh();
+      show("ok", "Added <b>" + esc(item) + "</b>. That's <b>" + addedProps +
+        (addedProps === 1 ? "</b> prop" : "</b> props") +
+        " so far — the scenes, cast and status are still set, so just name the next prop. " +
+        "Press Done when you're finished.");
+      $("#p_item").focus();
+    }
   } catch (err) {
     if (err.message !== "unauthorized") show("err", esc(err.message));
   } finally {
