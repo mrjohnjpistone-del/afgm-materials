@@ -176,6 +176,15 @@
   .ptable select{padding:7px 28px 7px 10px; font-size:13px; font-weight:700; background-position:right 8px center; min-width:140px}
   .p-acts{display:flex; gap:6px; justify-content:flex-end}
   .gate-wrap{margin-top:22px}
+  /* The account bar sits above both tabs so the password control is never hidden. */
+  .acctbar{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin:12px 0 2px}
+  dialog#pwDlg{border:1px solid var(--line-2); border-top:5px solid var(--wine); border-radius:12px;
+    padding:22px 24px; max-width:420px; width:calc(100% - 32px); background:var(--panel); color:var(--ink);
+    box-shadow:0 18px 50px rgba(20,16,8,.3)}
+  dialog#pwDlg::backdrop{background:rgba(28,24,16,.55)}
+  dialog#pwDlg h3{font-family:var(--serif); font-size:20px; margin:0 0 6px; color:var(--navy)}
+  dialog#pwDlg p{font-size:14px; line-height:1.5; color:var(--ink-soft); margin:0 0 14px}
+  .pw-acts{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -221,6 +230,13 @@
     <button class="tab" role="tab" id="tabProps" aria-controls="viewProps" aria-selected="false" type="button">Props</button>
   </div>
   <div class="rule"></div>
+
+  <!-- Always on screen, on both tabs. The password control used to live inside a
+       collapsed panel on the Materials tab, where nobody could find it. -->
+  <div class="acctbar">
+    <button class="btn btn-primary btn-sm" id="pwBtn" type="button">Change password</button>
+    <button class="btn btn-ghost btn-sm" id="signOut" type="button">Sign out of this device</button>
+  </div>
 
   <div id="msg" hidden></div>
 
@@ -272,7 +288,7 @@
     </div>
 
     <details class="tools">
-      <summary>Settings, public link &amp; change the password</summary>
+      <summary>List title and public link</summary>
       <div class="body">
         <div class="form-grid">
           <label class="full">
@@ -292,14 +308,6 @@
           </label>
           <div class="full">
             <button class="btn btn-ghost btn-sm" id="saveSettings" type="button">Save settings</button>
-          </div>
-          <label class="full">
-            <span class="lab">Change the password (at least 6 characters)</span>
-            <input id="s_key" maxlength="80" placeholder="New password">
-          </label>
-          <div class="full">
-            <button class="btn btn-ghost btn-sm" id="saveKey" type="button">Change password</button>
-            <button class="btn btn-ghost btn-sm" id="signOut" type="button">Sign out of this device</button>
           </div>
         </div>
       </div>
@@ -479,6 +487,21 @@
     Anyone with the public link can add items and props. Only this page can change or remove them.
   </div>
 </div>
+
+<!-- ── Change password ────────────────────────────────────────────────────── -->
+<dialog id="pwDlg">
+  <h3>Change the password</h3>
+  <p>Everyone who uses this page will need the new one. Write it down before you save it.</p>
+  <label>
+    <span class="lab">New password (at least 6 characters)</span>
+    <input id="s_key" maxlength="80" placeholder="New password" autocomplete="new-password">
+  </label>
+  <div class="pw-acts">
+    <button class="btn btn-primary" id="saveKey" type="button">Change password</button>
+    <button class="btn btn-ghost" id="pwCancel" type="button">Cancel</button>
+  </div>
+</dialog>
+
 <footer class="sponsors">
   <div class="sp-row">
     <div class="sp lead"><small>Brought to you by</small><span>Jay Hodge Ford</span></div>
@@ -920,17 +943,25 @@ $("#saveSettings").addEventListener("click", async () => {
   } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
 });
 
+$("#pwBtn").addEventListener("click", () => {
+  $("#s_key").value = "";
+  $("#pwDlg").showModal();
+  $("#s_key").focus();
+});
+$("#pwCancel").addEventListener("click", () => $("#pwDlg").close());
+
 $("#saveKey").addEventListener("click", async () => {
   const nk = $("#s_key").value.trim();
-  if (nk.length < 6) { show("err", "Use at least 6 characters for the password."); return; }
-  if (!confirm("Change the password? Anyone using the old one will have to be given the new password.")) return;
+  if (nk.length < 6) { alert("Use at least 6 characters for the password."); return; }
+  if (!confirm('Change the password to "' + nk + '"? Anyone using the old one will have to be given the new password.')) return;
   try {
     await api("POST", "/api/staff/key", { key: nk });
     KEY = nk;
     localStorage.setItem(KEYNAME, nk);
     $("#s_key").value = "";
+    $("#pwDlg").close();
     show("ok", "<span>Password changed. This device is still signed in.</span>");
-  } catch (err) { if (err.message !== "unauthorized") show("err", esc(err.message)); }
+  } catch (err) { if (err.message !== "unauthorized") { $("#pwDlg").close(); show("err", esc(err.message)); } }
 });
 
 $("#signOut").addEventListener("click", () => {
